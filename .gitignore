@@ -1,0 +1,13 @@
+build/
+build_common/
+.cache/
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+.env
+data/
+!data/.gitkeep
+temp_ls.txt
+test_sqlite.cmake
