@@ -6,6 +6,9 @@ add_executable(TestAll
     test_file_manager.cpp
     test_protocol.cpp
     test_database.cpp
+    test_peer_registry.cpp
+    test_tracker_server.cpp
+    test_state_manager.cpp
 )
 
 target_link_libraries(TestAll 
@@ -13,6 +16,7 @@ target_link_libraries(TestAll
     GTest::gtest_main 
     CommonLib 
     PeerLib
+    TrackerLib
 )
 
 include(GoogleTest)
