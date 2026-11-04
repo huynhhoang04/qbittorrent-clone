@@ -82,7 +82,7 @@ struct Tui::impl {
     }
 };
 
-Tui::Tui(PeerNode& node) : node(node), state(make_unique<impl>()) {}
+Tui::Tui(PeerNode& node) : node(node), state(make_shared<impl>()) {}
 
 Tui::~Tui() {
     Logger::clear_sink();
@@ -111,8 +111,8 @@ int Tui::run() {
         init_pair(4, COLOR_RED, -1);
     }
 
-    Logger::set_sink([&self = *state](log_level level, const string& message) {
-        self.append_log(level, message);
+    Logger::set_sink([state = state](log_level level, const string& message) {
+        state->append_log(level, message);
     });
 
     bool quit = false;

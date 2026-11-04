@@ -246,8 +246,10 @@ TEST(InvalidDataTest, ReceiverHandlesTruncatedBodyWithoutHang) {
     const vector<uint8_t> partial =
         framed(4096, {1, 2, 3, 4, 5, 6});
     ASSERT_TRUE(write_raw(pair.client_side(), partial));
-    net_close(pair.client_side());
-    pair.client_side();
+    // Hang up through the owner so the descriptor is closed exactly once;
+    // closing it directly here would leave ~SocketPair to close a number the
+    // OS may already have handed to another thread's live socket.
+    pair.close_client();
 
     wire_message received;
     string error;

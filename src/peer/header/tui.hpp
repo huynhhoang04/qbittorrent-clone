@@ -18,5 +18,7 @@ class Tui {
     private:
         struct impl;
         PeerNode& node;
-        std::unique_ptr<impl> state;
+        // Shared rather than unique: the logger holds the sink, and a network
+        // thread may still append to it while the dashboard is being destroyed.
+        std::shared_ptr<impl> state;
 };

@@ -181,6 +181,11 @@ int main(int argc, char* argv[]) {
     if (options.enable_tui) {
         Tui tui(node);
         exit_code = tui.run();
+        // The dashboard returns as soon as the user leaves it, so the transfer
+        // result still has to decide the process status.
+        if (exit_code == 0 && !download_path.empty() && !node.download_succeeded()) {
+            exit_code = 1;
+        }
     } else if (!download_path.empty() && options.exit_after_download) {
         node.stop();
         exit_code = download_ok ? 0 : 1;

@@ -75,7 +75,7 @@ struct Seeder {
 
     bool start(const string& dir, const string& id, const string& tracker_url,
                const torrent_info& torrent, const string& source,
-               int chunk_delay_ms) {
+               int chunk_delay_ms, bool only_first_half = false) {
         meta = torrent;
         filesystem::create_directories(dir);
         db = make_unique<Database>(dir + "/peer.db");
@@ -84,6 +84,13 @@ struct Seeder {
         state = make_unique<StateManager>(db.get());
         state->init_file_state(meta.file_hash, meta.num_chunks, true);
         state->mark_all_complete(meta.file_hash);
+        // Announced before the peer registers, so the tracker never advertises
+        // chunks this peer cannot actually serve.
+        if (only_first_half) {
+            for (size_t i = meta.num_chunks / 2; i < meta.num_chunks; ++i) {
+                state->mark_chunk_missing(meta.file_hash, static_cast<int>(i));
+            }
+        }
 
         upload = make_unique<UploadServer>(0, files.get(), state.get(), id);
         if (chunk_delay_ms > 0) {
@@ -186,9 +193,14 @@ TEST(FaultRecoveryTest, SeederDeathMidDownloadFailsOverToSecondSeeder) {
     // claims it held must return to the queue.
     slow.stop();
 
-    ASSERT_TRUE(testutil::wait_until([&]() { return done.load(); }, 90000, 100))
-        << "download did not finish after its seeder died";
+    const bool finished =
+        testutil::wait_until([&]() { return done.load(); }, 90000, 100);
+    // Always stop and join before asserting: an ASSERT would return from the
+    // test body and destroy a joinable std::thread, which aborts the whole
+    // binary instead of reporting the failure.
+    download->request_stop();
     worker.join();
+    ASSERT_TRUE(finished) << "download did not finish after its seeder died";
 
     EXPECT_TRUE(result.load()) << download->last_error();
     EXPECT_TRUE(state->is_completed(meta.file_hash));
@@ -305,7 +317,12 @@ class ChildPeer {
 
         void close() {
             if (process) {
-                WaitForSingleObject(process, 10000);
+                // Never leave the child running: a hung peer would otherwise
+                // survive the test and hold its database and output file open.
+                if (WaitForSingleObject(process, 10000) == WAIT_TIMEOUT) {
+                    TerminateProcess(process, 2);
+                    WaitForSingleObject(process, 5000);
+                }
                 CloseHandle(process);
                 process = nullptr;
             }
@@ -371,15 +388,21 @@ TEST(FaultRecoveryTest, RealProcessCrashResumesFromPersistedSqliteState) {
     atomic<int> chunks_at_kill{-1};
     ASSERT_TRUE(testutil::wait_until(
         [&]() {
-            Database probe(peer_db);
-            const vector<torrent_record> torrents = probe.get_all_torrents();
             int verified = 0;
-            for (const auto& torrent : torrents) {
-                for (const auto& chunk : probe.get_chunks(torrent.file_id)) {
-                    if (chunk.status == "verified") {
-                        verified++;
+            try {
+                // The child owns this database and is committing into it, so a
+                // poll can transiently fail with SQLITE_BUSY. Skipping that
+                // round is correct; letting it escape would abort the binary.
+                Database probe(peer_db);
+                for (const auto& torrent : probe.get_all_torrents()) {
+                    for (const auto& chunk : probe.get_chunks(torrent.file_id)) {
+                        if (chunk.status == "verified") {
+                            verified++;
+                        }
                     }
                 }
+            } catch (const exception&) {
+                return false;
             }
             if (verified > 1 &&
                 static_cast<size_t>(verified) < meta.num_chunks) {
@@ -393,6 +416,9 @@ TEST(FaultRecoveryTest, RealProcessCrashResumesFromPersistedSqliteState) {
 
     first_run.kill();
     first_run.close();
+    // Everything the seeder had already served when the peer died. The resume
+    // proof below is measured relative to this number.
+    const uint64_t served_at_kill = seeder.upload->total_chunks_uploaded();
 
     int exit_code = -1;
     ChildPeer second_run;
@@ -410,9 +436,22 @@ TEST(FaultRecoveryTest, RealProcessCrashResumesFromPersistedSqliteState) {
     EXPECT_GT(chunks_at_kill.load(), 0);
     EXPECT_LT(static_cast<size_t>(chunks_at_kill.load()), meta.num_chunks);
 
-    // The restarted run must not re-download the chunks it already had
-    // verified, which is what distinguishes a resume from a fresh transfer.
-    TrackerClient client(tracker.url());
+    // Resume, not restart: a peer that reloaded its persisted state only has to
+    // fetch the chunks it was still missing. With a single seeder a fresh
+    // download would re-fetch all of them, so the exact expectation is
+    // delta == num_chunks - verified_at_kill, plus one chunk of slack for a
+    // boundary request that was served but not yet verified when the kill hit.
+    const uint64_t served_after_resume = seeder.upload->total_chunks_uploaded();
+    const uint64_t fetched_on_resume = served_after_resume - served_at_kill;
+    const uint64_t missing_at_kill =
+        meta.num_chunks - static_cast<uint64_t>(chunks_at_kill.load());
+    EXPECT_GT(fetched_on_resume, 0u);
+    EXPECT_GT(static_cast<size_t>(chunks_at_kill.load()), 1u);
+    EXPECT_LE(fetched_on_resume, missing_at_kill + 1u)
+        << "the restarted peer fetched " << fetched_on_resume << " chunks after a "
+        << "kill at " << chunks_at_kill.load() << "/" << meta.num_chunks
+        << ", so it re-downloaded instead of resuming";
+
     seeder.stop();
     tracker.stop();
     testutil::remove_quietly(root);

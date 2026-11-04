@@ -27,5 +27,6 @@ gtest_discover_tests(TestAll)
 
 # The crash-recovery test must kill and restart a genuine peer process, so the
 # test binary needs the location of the real executable rather than a stub.
+add_dependencies(TestAll PeerApp)
 target_compile_definitions(TestAll PRIVATE
     PEER_APP_PATH="$<TARGET_FILE:PeerApp>")

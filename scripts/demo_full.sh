@@ -25,13 +25,18 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/qbt_demo_XXXXXX")"
 work="$(cd "$work" && pwd -P)"
 pids=()
 declare -a results=()
+# Peers are started through command substitution, which runs in a subshell, so
+# an in-memory array would lose their pids. The registry is a file instead.
+pid_registry="$work/pids"
+: >"$pid_registry"
 
 cleanup() {
-  for pid in "${pids[@]:-}"; do
+  local pid
+  for pid in $(cat "$pid_registry" 2>/dev/null) "${pids[@]:-}"; do
     kill -9 "$pid" >/dev/null 2>&1 || true
   done
   wait >/dev/null 2>&1 || true
-  rm -rf "$work"
+  rm -rf -- "$work"
 }
 trap cleanup EXIT
 
@@ -65,9 +70,10 @@ start_tracker() {
 start_peer() {
   local tag="$1" log="$2"
   shift 2
-  ( exec "$peer_bin" "$@" ) >"$log" 2>&1 &
-  pids+=($!)
-  echo $!
+  ( exec "$peer_bin" "$@" ) > "$log" 2>&1 &
+  local pid=$!
+  echo "$pid" >>"$pid_registry"
+  echo "$pid"
 }
 
 wait_for() {
@@ -321,7 +327,7 @@ scenario_crash_resume() {
   for _ in $(seq 1 120); do
     local body own trues bits
     body="$(peers_json "$port" "$id")"
-    own="$(echo "$body" | tr '{' '\n' | grep "\"port\":$leech_port" | head -1)"
+    own="$(printf '%s' "$body" | tr '{' '\n' | grep -E "\"port\":$leech_port(,|\})" | head -1)"
     trues="$(printf '%s' "$own" | tr ',' '\n' | grep -c 'true' || true)"
     bits="$(printf '%s' "$own" | tr ',' '\n' | grep -cE 'true|false' || true)"
     if [ "${bits:-0}" -gt 0 ] && [ "${trues:-0}" -gt 0 ] && [ "$trues" -lt "$bits" ]; then
@@ -350,10 +356,19 @@ scenario_crash_resume() {
   fi
   kill -9 "$seeder" >/dev/null 2>&1 || true
 
-  local got
+  local got fetched bits
   got="$(sha "$root/out/file.bin" 2>/dev/null || echo MISSING)"
-  if [ "$got" = "$expected" ]; then
-    record 6 "Crash resume from persisted state" "PASS: killed at $partial verified chunk(s), restarted peer resumed from the same data dir and sha256 matches"
+  bits="${partial#*/}"
+  # Chunks the survivor had to serve after the restart. Fewer than the whole
+  # file means the peer resumed from its persisted state; equal to it means the
+  # run silently re-downloaded everything.
+  fetched="$(grep -oE 'Contributed [0-9]+ chunk' "$root/leech2.log" |
+             grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')"
+  if [ "$got" = "$expected" ] && [ "${fetched:-0}" -gt 0 ] &&
+     [ "$fetched" -lt "$bits" ]; then
+    record 6 "Crash resume from persisted state" "PASS: killed at $partial verified chunk(s), restart re-fetched only $fetched of $bits, sha256 matches"
+  elif [ "$got" = "$expected" ]; then
+    record 6 "Crash resume from persisted state" "FAIL: file is correct but the restart re-fetched $fetched/$bits chunks, which is a fresh download, not a resume"
   else
     record 6 "Crash resume from persisted state" "FAIL: expected $expected got $got"
   fi
