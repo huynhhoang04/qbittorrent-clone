@@ -1,9 +1,6 @@
 #include "tracker_client.hpp"
 #include "logger.hpp"
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include "net.hpp"
 #include <nlohmann/json.hpp>
 
 using namespace std;
@@ -68,23 +65,20 @@ string TrackerClient::send_http_request(const string& method, const string& path
         return "";
     }
 
-    int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sock < 0) {
+    socket_t sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (!net_valid(sock)) {
         log.err("Cannot create socket");
         freeaddrinfo(res);
         return "";
     }
 
-    // Thiết lập timeout 3 giây để tránh bị treo
-    struct timeval tv;
-    tv.tv_sec = 3;
-    tv.tv_usec = 0;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
+    // Bounded timeout so a stalled tracker cannot hang the peer.
+    net_set_timeouts(sock, 3000);
 
-    if (connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
+    if (!net_connect_timeout(sock, res->ai_addr,
+                             static_cast<int>(res->ai_addrlen), 3000)) {
         log.err("Cannot connect to Tracker at " + host + ":" + port_str);
-        close(sock);
+        net_close(sock);
         freeaddrinfo(res);
         return "";
     }
@@ -106,21 +100,21 @@ string TrackerClient::send_http_request(const string& method, const string& path
     }
 
     string req_data = request_ss.str();
-    if (send(sock, req_data.c_str(), req_data.length(), 0) < 0) {
+    if (!net_send_all(sock, req_data.data(), req_data.size())) {
         log.err("Failed to send request to Tracker");
-        close(sock);
+        net_close(sock);
         return "";
     }
 
     // Nhận response
     string response_str;
     char buffer[4096];
-    ssize_t bytes_read;
-    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    int bytes_read;
+    while ((bytes_read = net_recv_some(sock, buffer, sizeof(buffer) - 1)) > 0) {
         buffer[bytes_read] = '\0';
-        response_str.append(buffer, bytes_read);
+        response_str.append(buffer, static_cast<size_t>(bytes_read));
     }
-    close(sock);
+    net_close(sock);
 
     // Kiểm tra status code trong header (VD: HTTP/1.1 200 OK)
     size_t line_end = response_str.find("\r\n");

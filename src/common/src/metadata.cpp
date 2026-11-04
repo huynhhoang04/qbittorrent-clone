@@ -27,7 +27,7 @@ bool Metadata::generate_torrent(const string &input_path, size_t chunk_size, con
         return false;
     }
     SHA256 sha;
-    info.file_name = filesystem::path(input_path).filename();
+    info.file_name = filesystem::path(input_path).filename().string();
     info.file_size = filesystem::file_size(input_path);
     info.chunk_size = chunk_size;
     info.file_hash = sha.hash_file(input_path);
