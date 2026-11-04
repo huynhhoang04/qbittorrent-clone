@@ -631,7 +631,6 @@ TEST(ConcurrentDownloadTest, PeerRegisteringAfterStartIsAdoptedPromptly) {
     ASSERT_TRUE(leecher.start(root + "/leecher", "leech-late-peer",
                               tracker.url(), meta, root + "/download.bin", 5, 4));
 
-    const auto started = chrono::steady_clock::now();
     auto future = std::async(std::launch::async, [&]() {
         return LeecherNode::run_blocking(leecher, tracker.url());
     });
@@ -643,18 +642,27 @@ TEST(ConcurrentDownloadTest, PeerRegisteringAfterStartIsAdoptedPromptly) {
     ASSERT_TRUE(late.start(root + "/seed_late", "seed-late-full", tracker.url(),
                            meta, source, full_bitfield(meta.num_chunks)));
 
+    // Timed from the moment the new peer is registered, so this measures how
+    // long the swarm took to notice it rather than the fixed sleep above.
+    const auto adopted = chrono::steady_clock::now();
     const bool ready = future.wait_for(chrono::seconds(30)) == std::future_status::ready;
     const auto elapsed_ms = chrono::duration_cast<chrono::milliseconds>(
-        chrono::steady_clock::now() - started).count();
-    std::cout << "LATE_PEER_PROBE elapsed_ms=" << elapsed_ms << "\n";
+        chrono::steady_clock::now() - adopted).count();
+    std::cout << "LATE_PEER_PROBE adoption_ms=" << elapsed_ms << "\n";
 
     ASSERT_TRUE(ready) << "the late peer was never adopted";
     EXPECT_TRUE(future.get());
     EXPECT_EQ(testutil::file_sha256(leecher.output_path), source_hash);
     EXPECT_TRUE(leecher.state_manager->is_completed(meta.file_hash));
-    EXPECT_LT(elapsed_ms, 2200)
-        << "adopting a peer that appeared mid-download took " << elapsed_ms
-        << " ms, so the scheduler only noticed it after idle sessions expired";
+    // The cadence re-asks at most rediscovery_interval ms apart and eight
+    // 32 KiB chunks cross loopback in well under 100 ms, so a healthy scheduler
+    // lands near 500 ms. Before the fix the download sat idle for the whole
+    // 40 x 50 ms spin budget and only resumed when that session expired, which
+    // measured 1300-1400 ms from the same point.
+    EXPECT_LT(elapsed_ms, 1000)
+        << "a peer that appeared mid-download took " << elapsed_ms
+        << " ms to be used, so the scheduler only noticed it after idle "
+        << "sessions expired";
 
     late.stop_upload();
     early.stop_upload();

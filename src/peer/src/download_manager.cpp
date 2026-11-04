@@ -875,8 +875,15 @@ bool DownloadManager::run_scheduler() {
     // session is alive, because discovery used to run only once active_peers
     // fell back to zero. An idle worker that cannot claim anything holds a
     // slot for its whole spin budget, so a newly available source went unnoticed
-    // for about two seconds. Re-asking on a bounded cadence adopts it promptly;
-    // the failure budget below still only counts when nothing is connected.
+    // for about two seconds. Re-asking on a bounded cadence adopts it promptly.
+    //
+    // The cadence must stay gated on active_peers > 0. discover_peers() reports
+    // whether anything new appeared, and the idle path below relies on consuming
+    // that result to reset its failure budget. Running both in the same
+    // iteration made the budget climb even though a peer had just been adopted,
+    // and with the default interval equal to the idle wait period that happened
+    // on every tick, turning a healthy swarm into a "no peer can provide the
+    // remaining chunks" abort.
     const int rediscovery_interval_ms =
         std::max(250, options.discovery_wait_ms);
     auto last_discovery = chrono::steady_clock::now();
@@ -884,10 +891,13 @@ bool DownloadManager::run_scheduler() {
     while (!stop_flag.load()) {
         start_available_sessions();
 
-        if (chrono::steady_clock::now() - last_discovery >=
-            chrono::milliseconds(rediscovery_interval_ms)) {
+        if (active_peers.load() > 0 &&
+            chrono::steady_clock::now() - last_discovery >=
+                chrono::milliseconds(rediscovery_interval_ms)) {
             last_discovery = chrono::steady_clock::now();
-            discover_peers();
+            if (discover_peers()) {
+                discovery_failures = 0;
+            }
         }
 
         {
