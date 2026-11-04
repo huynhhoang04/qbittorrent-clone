@@ -644,21 +644,31 @@ TEST(ConcurrentDownloadTest, PeerRegisteringAfterStartIsAdoptedPromptly) {
 
     // Timed from the moment the new peer is registered, so this measures how
     // long the swarm took to notice it rather than the fixed sleep above.
+    const int peers_at_registration = leecher.download->get_stats().active_peers;
     const auto adopted = chrono::steady_clock::now();
     const bool ready = future.wait_for(chrono::seconds(30)) == std::future_status::ready;
     const auto elapsed_ms = chrono::duration_cast<chrono::milliseconds>(
         chrono::steady_clock::now() - adopted).count();
-    std::cout << "LATE_PEER_PROBE adoption_ms=" << elapsed_ms << "\n";
+    std::cout << "LATE_PEER_PROBE adoption_ms=" << elapsed_ms
+              << " active_peers_at_registration=" << peers_at_registration << "\n";
 
     ASSERT_TRUE(ready) << "the late peer was never adopted";
     EXPECT_TRUE(future.get());
     EXPECT_EQ(testutil::file_sha256(leecher.output_path), source_hash);
     EXPECT_TRUE(leecher.state_manager->is_completed(meta.file_hash));
-    // The cadence re-asks at most rediscovery_interval ms apart and eight
-    // 32 KiB chunks cross loopback in well under 100 ms, so a healthy scheduler
-    // lands near 500 ms. Before the fix the download sat idle for the whole
-    // 40 x 50 ms spin budget and only resumed when that session expired, which
-    // measured 1300-1400 ms from the same point.
+    // The idle worker's spin budget is 40 x 50 ms, so if it had already expired
+    // the session would be gone and the idle path would adopt the new peer
+    // instead. That branch is legitimate but it is not the one under test, so
+    // the cadence path must still be occupied at registration or the timing
+    // assertion below would pass without exercising the fix.
+    EXPECT_GE(peers_at_registration, 1)
+        << "the idle session had already exited at registration, so this run "
+           "measured the idle discovery path rather than the cadence";
+    // The cadence re-asks at most max(250, discovery_wait_ms) apart, and this
+    // test sets discovery_wait_ms = 100, so the interval is 250 ms. Eight
+    // 32 KiB chunks cross loopback in well under 100 ms, putting a healthy
+    // scheduler near 250-300 ms; without the cadence the download sat idle for
+    // the rest of the spin budget and measured 1294-1339 ms from the same point.
     EXPECT_LT(elapsed_ms, 1000)
         << "a peer that appeared mid-download took " << elapsed_ms
         << " ms to be used, so the scheduler only noticed it after idle "
