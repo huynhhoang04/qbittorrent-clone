@@ -3,6 +3,7 @@
 
 #include "logger.hpp"
 #include "peer_node.hpp"
+#include "tui.hpp"
 
 using namespace std;
 
@@ -54,6 +55,8 @@ void print_usage(const char* program) {
     cout << "  --chunk-delay-ms <n>     Artificial delay before serving each chunk (tests)\n";
     cout << "  --corrupt-chunks <list>  Comma-separated chunk indexes to corrupt on upload\n";
     cout << "  --exit-after-download    Exit once the download completes or fails\n";
+    cout << "  --tui                    Enable the ncurses dashboard\n";
+    cout << "  --headless               Disable the dashboard (default)\n";
     cout << "  --help, -h               Show this help\n";
 }
 
@@ -112,6 +115,10 @@ int main(int argc, char* argv[]) {
             parsed_options.corrupt_chunks = parse_chunk_list(next_value("--corrupt-chunks"));
         } else if (arg == "--exit-after-download") {
             parsed_options.exit_after_download = true;
+        } else if (arg == "--tui") {
+            parsed_options.enable_tui = true;
+        } else if (arg == "--headless") {
+            parsed_options.enable_tui = false;
         } else if (arg == "--help" || arg == "-h") {
             print_usage(argv[0]);
             return 0;
@@ -150,7 +157,14 @@ int main(int argc, char* argv[]) {
 
     bool download_ok = true;
     if (!download_path.empty()) {
-        download_ok = node.download_file(download_path, output_dir);
+        if (options.enable_tui) {
+            if (!node.start_download_async(download_path, output_dir)) {
+                log.err("Could not start the download");
+                download_ok = false;
+            }
+        } else {
+            download_ok = node.download_file(download_path, output_dir);
+        }
     }
 
     atomic<bool> watcher_done{false};
@@ -164,7 +178,10 @@ int main(int argc, char* argv[]) {
     });
 
     int exit_code = 0;
-    if (!download_path.empty() && options.exit_after_download) {
+    if (options.enable_tui) {
+        Tui tui(node);
+        exit_code = tui.run();
+    } else if (!download_path.empty() && options.exit_after_download) {
         node.stop();
         exit_code = download_ok ? 0 : 1;
     } else {
