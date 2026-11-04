@@ -240,7 +240,6 @@ scenario_failover() {
     --exit-after-download)"
   sleep 4
   "$script_dir/inject_fault.sh" "$doomed" crash >"$root/fault.log" 2>&1
-  pids=("${pids[@]/$doomed}")
 
   if ! wait_for "$leech_pid" 180; then
     kill -9 "$leech_pid" "$healthy" >/dev/null 2>&1 || true
@@ -343,7 +342,6 @@ scenario_crash_resume() {
     return
   fi
   "$script_dir/inject_fault.sh" "$first_pid" crash >"$root/fault.log" 2>&1
-  pids=("${pids[@]/$first_pid}")
 
   local second_pid
   second_pid="$(start_peer leech2 "$root/leech2.log" --tracker "$url" --port 0 \
@@ -395,7 +393,6 @@ scenario_tracker_expiry() {
   fi
 
   "$script_dir/inject_fault.sh" "$victim" crash >"$root/fault.log" 2>&1
-  pids=("${pids[@]/$victim}")
 
   local start now elapsed=""
   start="$(date +%s)"
