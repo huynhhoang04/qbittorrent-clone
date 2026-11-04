@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.4.3)
+cmake_minimum_required(VERSION 3.16)
 project(TrackerApp VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -27,7 +27,10 @@ add_library(TrackerLib STATIC
     src/tracker_server.cpp
 )
 
-target_link_libraries(TrackerLib PRIVATE CommonLib Crow::Crow Threads::Threads)
+target_link_libraries(TrackerLib PUBLIC CommonLib Crow::Crow Threads::Threads)
+if(WIN32)
+    target_link_libraries(TrackerLib PUBLIC mswsock ws2_32)
+endif()
 target_include_directories(TrackerLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/header)
 
 add_executable(TrackerApp src/main.cpp)
