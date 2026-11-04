@@ -935,6 +935,22 @@ bool DownloadManager::run_scheduler() {
     }
 
     log.success("Download complete and verified for file " + current_file_id);
+
+    // Report which peers actually delivered chunks. Without this a multi-source
+    // transfer is indistinguishable from a single-source one in the logs, which
+    // is the evidence the demo scenarios need.
+    {
+        int contributors = 0;
+        for (const auto& peer : get_peer_status()) {
+            if (peer.chunks_downloaded > 0) {
+                log.info("Contributed " + to_string(peer.chunks_downloaded) +
+                         " chunk(s) by peer " + peer.peer_id);
+                contributors++;
+            }
+        }
+        log.info("Multi-source summary: " + to_string(contributors) +
+                 " peer(s) delivered chunks");
+    }
     return true;
 }
 
