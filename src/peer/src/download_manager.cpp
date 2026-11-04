@@ -871,8 +871,24 @@ bool DownloadManager::run_scheduler() {
         log.warnning("No peers discovered yet for file " + current_file_id);
     }
 
+    // A peer that registers after the download starts is invisible while any
+    // session is alive, because discovery used to run only once active_peers
+    // fell back to zero. An idle worker that cannot claim anything holds a
+    // slot for its whole spin budget, so a newly available source went unnoticed
+    // for about two seconds. Re-asking on a bounded cadence adopts it promptly;
+    // the failure budget below still only counts when nothing is connected.
+    const int rediscovery_interval_ms =
+        std::max(250, options.discovery_wait_ms);
+    auto last_discovery = chrono::steady_clock::now();
+
     while (!stop_flag.load()) {
         start_available_sessions();
+
+        if (chrono::steady_clock::now() - last_discovery >=
+            chrono::milliseconds(rediscovery_interval_ms)) {
+            last_discovery = chrono::steady_clock::now();
+            discover_peers();
+        }
 
         {
             lock_guard<mutex> lock(mtx);

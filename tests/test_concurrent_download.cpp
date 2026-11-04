@@ -600,6 +600,67 @@ TEST(ConcurrentDownloadTest, CorruptedChunksAreDetectedRequeuedAndRefetched) {
     leecher.stop_upload();
 }
 
+// A peer that registers after the download began must be adopted promptly.
+// Without periodic re-discovery the tracker is only re-asked once every session
+// has dropped, and an idle worker holds its slot for the whole spin budget, so
+// the new source sat unnoticed for roughly two seconds.
+TEST(ConcurrentDownloadTest, PeerRegisteringAfterStartIsAdoptedPromptly) {
+    const int tracker_port = testutil::reserve_port();
+    ASSERT_GT(tracker_port, 0);
+    TrackerFixture tracker(tracker_port);
+    ASSERT_TRUE(tracker.is_ready());
+
+    const string root = testutil::make_temp_dir("m5_late_peer");
+    const string source = root + "/source.bin";
+    const string torrent_path = root + "/source.torrent.json";
+    ASSERT_TRUE(testutil::write_pattern_file(source, 512 * 1024, 31337u));
+    const string source_hash = testutil::file_sha256(source);
+    const torrent_info meta =
+        make_torrent(source, 32 * 1024, torrent_path, tracker.url());
+
+    vector<bool> first_half(meta.num_chunks, false);
+    for (size_t i = 0; i < meta.num_chunks / 2; ++i) {
+        first_half[i] = true;
+    }
+
+    SeederNode early;
+    ASSERT_TRUE(early.start(root + "/seed_early", "seed-early-half",
+                            tracker.url(), meta, source, first_half));
+
+    LeecherNode leecher;
+    ASSERT_TRUE(leecher.start(root + "/leecher", "leech-late-peer",
+                              tracker.url(), meta, root + "/download.bin", 5, 4));
+
+    const auto started = chrono::steady_clock::now();
+    auto future = std::async(std::launch::async, [&]() {
+        return LeecherNode::run_blocking(leecher, tracker.url());
+    });
+
+    // Let the download reach its idle state, then introduce the only peer that
+    // holds the remaining half.
+    this_thread::sleep_for(chrono::milliseconds(1200));
+    SeederNode late;
+    ASSERT_TRUE(late.start(root + "/seed_late", "seed-late-full", tracker.url(),
+                           meta, source, full_bitfield(meta.num_chunks)));
+
+    const bool ready = future.wait_for(chrono::seconds(30)) == std::future_status::ready;
+    const auto elapsed_ms = chrono::duration_cast<chrono::milliseconds>(
+        chrono::steady_clock::now() - started).count();
+    std::cout << "LATE_PEER_PROBE elapsed_ms=" << elapsed_ms << "\n";
+
+    ASSERT_TRUE(ready) << "the late peer was never adopted";
+    EXPECT_TRUE(future.get());
+    EXPECT_EQ(testutil::file_sha256(leecher.output_path), source_hash);
+    EXPECT_TRUE(leecher.state_manager->is_completed(meta.file_hash));
+    EXPECT_LT(elapsed_ms, 2200)
+        << "adopting a peer that appeared mid-download took " << elapsed_ms
+        << " ms, so the scheduler only noticed it after idle sessions expired";
+
+    late.stop_upload();
+    early.stop_upload();
+    leecher.stop_upload();
+}
+
 TEST(ConcurrentDownloadTest, RepeatedSwarmStressWithoutDeadlock) {
     const int tracker_port = testutil::reserve_port();
     ASSERT_GT(tracker_port, 0);
