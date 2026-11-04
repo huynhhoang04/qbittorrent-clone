@@ -189,6 +189,13 @@ TEST(FaultRecoveryTest, SeederDeathMidDownloadFailsOverToSecondSeeder) {
         return download->get_stats().chunks_verified > 0;
     }, 20000, 25));
 
+    // The kill must land mid-transfer, otherwise there is nothing to fail over
+    // from and a green result would prove nothing.
+    const size_t verified_at_kill = download->get_stats().chunks_verified;
+    ASSERT_LT(verified_at_kill, meta.num_chunks)
+        << "the file was already complete when the seeder was killed";
+    const uint64_t healthy_before_kill = healthy.upload->total_chunks_uploaded();
+
     // Kill the source the download is currently progressing with. The chunk
     // claims it held must return to the queue.
     slow.stop();
@@ -205,7 +212,11 @@ TEST(FaultRecoveryTest, SeederDeathMidDownloadFailsOverToSecondSeeder) {
     EXPECT_TRUE(result.load()) << download->last_error();
     EXPECT_TRUE(state->is_completed(meta.file_hash));
     EXPECT_EQ(testutil::file_sha256(output), source_hash);
-    EXPECT_GT(download->get_stats().retries, 0u);
+    // Failover evidence: the surviving peer had to carry the chunks that were
+    // still missing when the other one died. Whether a claim had to be requeued
+    // depends on exact kill timing, so the retry counter is not asserted.
+    EXPECT_GT(healthy.upload->total_chunks_uploaded(), healthy_before_kill)
+        << "the surviving seeder served nothing after the kill";
     EXPECT_GT(healthy.upload->total_chunks_uploaded(), 0u);
 
     download->request_stop();
