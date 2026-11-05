@@ -10,6 +10,8 @@ add_executable(TestAll
     test_tracker_server.cpp
     test_state_manager.cpp
     test_concurrent_download.cpp
+    test_invalid_data.cpp
+    test_fault_recovery.cpp
 )
 
 target_link_libraries(TestAll 
@@ -22,3 +24,9 @@ target_link_libraries(TestAll
 
 include(GoogleTest)
 gtest_discover_tests(TestAll)
+
+# The crash-recovery test must kill and restart a genuine peer process, so the
+# test binary needs the location of the real executable rather than a stub.
+add_dependencies(TestAll PeerApp)
+target_compile_definitions(TestAll PRIVATE
+    PEER_APP_PATH="$<TARGET_FILE:PeerApp>")
