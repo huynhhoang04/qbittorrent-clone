@@ -19,6 +19,7 @@ struct peer_node_options {
     int io_timeout_ms = 4000;
     int chunk_delay_ms = 0;
     bool exit_after_download = false;
+    bool enable_tui = false;
     vector<int> corrupt_chunks;
 };
 
