@@ -1,4 +1,4 @@
-find_package(GTest REQUIRED)
+find_package(GTest REQUIRED CONFIG)
 
 add_executable(TestAll 
     test_sha256.cpp 
@@ -9,6 +9,7 @@ add_executable(TestAll
     test_peer_registry.cpp
     test_tracker_server.cpp
     test_state_manager.cpp
+    test_concurrent_download.cpp
 )
 
 target_link_libraries(TestAll 

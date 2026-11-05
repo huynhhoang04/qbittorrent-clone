@@ -1,87 +1,191 @@
 #include <bits/stdc++.h>
 #include <csignal>
-#include "peer_node.hpp"
+
 #include "logger.hpp"
+#include "peer_node.hpp"
 
 using namespace std;
 
-static PeerNode* g_peer_node = nullptr;
+static volatile std::sig_atomic_t g_shutdown_requested = 0;
 
-void handle_peer_signal(int signum) {
-    Logger log;
-    log.warnning("Signal " + to_string(signum) + " received, stopping peer node...");
-    if (g_peer_node) {
-        g_peer_node->stop();
-    }
+namespace {
+
+void handle_peer_signal(int) {
+    // The actual shutdown happens on the watcher thread; only the async-signal
+    // safe flag is touched here.
+    g_shutdown_requested = 1;
 }
+
+vector<int> parse_chunk_list(const string& value) {
+    vector<int> chunks;
+    stringstream stream(value);
+    string item;
+    while (getline(stream, item, ',')) {
+        if (item.empty()) {
+            continue;
+        }
+        try {
+            const int chunk = stoi(item);
+            if (chunk >= 0) {
+                chunks.push_back(chunk);
+            }
+        } catch (const exception&) {
+            // Ignore malformed entries; the CLI validator reports bad flags
+            // separately when a value cannot be parsed at all.
+        }
+    }
+    return chunks;
+}
+
+void print_usage(const char* program) {
+    cout << "Usage: " << program << " [options]\n";
+    cout << "Options:\n";
+    cout << "  --tracker <url>          Tracker URL (default: http://localhost:8080)\n";
+    cout << "  -p, --port <port>        Upload listening port (default: 6881, 0 = auto)\n";
+    cout << "  --data-dir <dir>         Working/storage directory (default: ./data/peer)\n";
+    cout << "  --seed <file>            Seed a file (metadata is generated if needed)\n";
+    cout << "  --download <torrent>     Download a torrent file\n";
+    cout << "  --output-dir <dir>       Destination directory for downloads\n";
+    cout << "  --chunk-size <bytes>     Chunk size used when generating metadata\n";
+    cout << "  --max-downloads <n>      Maximum concurrent download connections (default 5)\n";
+    cout << "  --max-uploads <n>        Maximum concurrent upload slots (default 5)\n";
+    cout << "  --pipeline-depth <n>     Requests kept in flight per peer (default 3)\n";
+    cout << "  --io-timeout-ms <n>      Socket timeout in milliseconds (default 4000)\n";
+    cout << "  --chunk-delay-ms <n>     Artificial delay before serving each chunk (tests)\n";
+    cout << "  --corrupt-chunks <list>  Comma-separated chunk indexes to corrupt on upload\n";
+    cout << "  --exit-after-download    Exit once the download completes or fails\n";
+    cout << "  --help, -h               Show this help\n";
+}
+
+} // namespace
 
 int main(int argc, char* argv[]) {
     Logger log;
     string tracker_url = "http://localhost:8080";
     int port = 6881;
     string data_dir = "./data/peer";
-    string seed_path = "";
-    string download_path = "";
+    string seed_path;
+    string download_path;
+    string output_dir;
+
+    peer_node_options options;
+    peer_node_options parsed_options;
+    size_t chunk_size = 256 * 1024;
+    bool option_error = false;
 
     for (int i = 1; i < argc; ++i) {
-        string arg = argv[i];
-        if (arg == "--tracker" && i + 1 < argc) {
-            tracker_url = argv[++i];
-        } else if ((arg == "--port" || arg == "-p") && i + 1 < argc) {
-            port = stoi(argv[++i]);
-        } else if (arg == "--data-dir" && i + 1 < argc) {
-            data_dir = argv[++i];
-        } else if (arg == "--seed" && i + 1 < argc) {
-            seed_path = argv[++i];
-        } else if (arg == "--download" && i + 1 < argc) {
-            download_path = argv[++i];
+        const string arg = argv[i];
+        auto next_value = [&](const char* name) -> string {
+            if (i + 1 >= argc) {
+                cerr << "Missing value for " << name << "\n";
+                option_error = true;
+                return "";
+            }
+            return argv[++i];
+        };
+
+        if (arg == "--tracker") {
+            tracker_url = next_value("--tracker");
+        } else if (arg == "--port" || arg == "-p") {
+            port = stoi(next_value("--port"));
+        } else if (arg == "--data-dir") {
+            data_dir = next_value("--data-dir");
+        } else if (arg == "--seed") {
+            seed_path = next_value("--seed");
+        } else if (arg == "--download") {
+            download_path = next_value("--download");
+        } else if (arg == "--output-dir") {
+            output_dir = next_value("--output-dir");
+        } else if (arg == "--chunk-size") {
+            chunk_size = static_cast<size_t>(stoull(next_value("--chunk-size")));
+        } else if (arg == "--max-downloads") {
+            parsed_options.max_active_downloads = stoi(next_value("--max-downloads"));
+        } else if (arg == "--max-uploads") {
+            parsed_options.max_active_uploads = stoi(next_value("--max-uploads"));
+        } else if (arg == "--pipeline-depth") {
+            parsed_options.pipeline_depth = stoi(next_value("--pipeline-depth"));
+        } else if (arg == "--io-timeout-ms") {
+            parsed_options.io_timeout_ms = stoi(next_value("--io-timeout-ms"));
+        } else if (arg == "--chunk-delay-ms") {
+            parsed_options.chunk_delay_ms = stoi(next_value("--chunk-delay-ms"));
+        } else if (arg == "--corrupt-chunks") {
+            parsed_options.corrupt_chunks = parse_chunk_list(next_value("--corrupt-chunks"));
+        } else if (arg == "--exit-after-download") {
+            parsed_options.exit_after_download = true;
         } else if (arg == "--help" || arg == "-h") {
-            cout << "Usage: " << argv[0] << " [options]\n";
-            cout << "Options:\n";
-            cout << "  --tracker <url>        Tracker URL (default: http://localhost:8080)\n";
-            cout << "  -p, --port <port>      Upload listening port (default: 6881)\n";
-            cout << "  --data-dir <dir>       Working/Storage directory (default: ./data/peer)\n";
-            cout << "  --seed <file>          Run in Seeder mode for file\n";
-            cout << "  --download <torrent>   Run in Leecher mode to download torrent\n";
+            print_usage(argv[0]);
             return 0;
+        } else {
+            cerr << "Unknown option: " << arg << "\n";
+            return 2;
         }
     }
 
+    if (option_error) {
+        return 2;
+    }
+    if (chunk_size == 0) {
+        cerr << "--chunk-size must be greater than zero\n";
+        return 2;
+    }
+
+    options = parsed_options;
     signal(SIGINT, handle_peer_signal);
+#ifdef SIGTERM
     signal(SIGTERM, handle_peer_signal);
+#endif
 
     PeerNode node(tracker_url, port, data_dir);
-    g_peer_node = &node;
+    node.set_options(options);
 
     if (!node.start()) {
         log.err("Failed to start PeerNode");
         return 1;
     }
 
+    bool setup_ok = true;
     if (!seed_path.empty()) {
-        log.info("Running as Seeder for: " + seed_path);
-        node.seed_file(seed_path);
-        // Giữ node chạy để phục vụ upload
-        while (node.running()) {
-            this_thread::sleep_for(chrono::seconds(1));
+        setup_ok = node.seed_file(seed_path, chunk_size) && setup_ok;
+    }
+
+    bool download_ok = true;
+    if (!download_path.empty()) {
+        download_ok = node.download_file(download_path, output_dir);
+    }
+
+    atomic<bool> watcher_done{false};
+    thread watcher([&node, &watcher_done]() {
+        while (!watcher_done.load() && !g_shutdown_requested && node.running()) {
+            this_thread::sleep_for(chrono::milliseconds(200));
         }
-    } else if (!download_path.empty()) {
-        log.info("Running as Downloader for: " + download_path);
-        bool res = node.download_file(download_path);
-        if (res) {
-            log.success("Download finished! Continuing to seed...");
-            while (node.running()) {
-                this_thread::sleep_for(chrono::seconds(1));
-            }
+        if (g_shutdown_requested && node.running()) {
+            node.stop();
         }
+    });
+
+    int exit_code = 0;
+    if (!download_path.empty() && options.exit_after_download) {
+        node.stop();
+        exit_code = download_ok ? 0 : 1;
     } else {
-        log.info("PeerNode running in idle mode. Press Ctrl+C to stop.");
-        while (node.running()) {
-            this_thread::sleep_for(chrono::seconds(1));
+        while (node.running() && !g_shutdown_requested) {
+            this_thread::sleep_for(chrono::milliseconds(500));
+        }
+        node.stop();
+        if (!download_path.empty() && !download_ok && !g_shutdown_requested) {
+            exit_code = 1;
+        }
+        if (!setup_ok) {
+            exit_code = 1;
         }
     }
 
-    g_peer_node = nullptr;
+    watcher_done.store(true);
+    node.stop();
+    if (watcher.joinable()) {
+        watcher.join();
+    }
+
     log.success("PeerApp exited cleanly");
-    return 0;
+    return exit_code;
 }
