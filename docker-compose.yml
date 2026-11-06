@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  tracker:
+    build: .
+    container_name: p2p_tracker
+    command: ./build/src/tracker/TrackerApp
+    ports:
+      - "8080:8080"
+    networks:
+      - p2p_network
+    restart: on-failure
+
+  peer1:
+    build: .
+    container_name: p2p_peer_1
+    command: ./build/src/peer/PeerApp
+    environment:
+      - TRACKER_URL=http://tracker:8080  # Chỉ đường cho Peer tìm Tracker qua mạng nội bộ
+      - PEER_HOST=peer1
+    depends_on:
+      - tracker
+    networks:
+      - p2p_network
+    tty: true
+    stdin_open: true
+
+  peer2:
+    build: .
+    container_name: p2p_peer_2
+    command: ./build/src/peer/PeerApp
+    environment:
+      - TRACKER_URL=http://tracker:8080
+      - PEER_HOST=peer2
+    depends_on:
+      - tracker
+    networks:
+      - p2p_network
+    tty: true
+    stdin_open: true
+
+  peer3:
+    build: .
+    container_name: p2p_peer_3
+    command: ./build/src/peer/PeerApp
+    environment:
+      - TRACKER_URL=http://tracker:8080
+      - PEER_HOST=peer3
+    depends_on:
+      - tracker
+    networks:
+      - p2p_network
+    tty: true
+    stdin_open: true
+
+networks:
+  p2p_network:
+    driver: bridge
