@@ -1,6 +1,7 @@
 #include "peer_node.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 
 #include "logger.hpp"
@@ -9,8 +10,27 @@
 using namespace std;
 using namespace std::chrono;
 
-PeerNode::PeerNode(const string& tracker_url, int port, const string& data_dir)
-    : tracker_url(tracker_url), port(port), data_dir(data_dir) {
+namespace
+{
+
+    string resolve_tracker_url(const string &configured_url)
+    {
+        if (!configured_url.empty())
+        {
+            return configured_url;
+        }
+
+        const char *tracker_url_env = std::getenv("TRACKER_URL");
+        return tracker_url_env && *tracker_url_env
+                   ? tracker_url_env
+                   : "http://localhost:8080";
+    }
+
+} // namespace
+
+PeerNode::PeerNode(const string &tracker_url, int port, const string &data_dir)
+    : tracker_url(resolve_tracker_url(tracker_url)), port(port), data_dir(data_dir)
+{
     filesystem::create_directories(data_dir);
     // Identity has to be unique per process. Several peers routinely request
     // the same listening port (0 means "bind any free port") and the
@@ -37,17 +57,19 @@ PeerNode::PeerNode(const string& tracker_url, int port, const string& data_dir)
     state_manager = make_unique<StateManager>(db.get());
     tracker_client = make_unique<TrackerClient>(tracker_url);
     upload_server = make_unique<UploadServer>(port, file_manager.get(),
-                                             state_manager.get(), peer_id);
+                                              state_manager.get(), peer_id);
     download_manager = make_unique<DownloadManager>(
         file_manager.get(), state_manager.get(), tracker_client.get(), peer_id);
     last_announce = steady_clock::now() - seconds(10);
 }
 
-PeerNode::~PeerNode() {
+PeerNode::~PeerNode()
+{
     stop();
 }
 
-void PeerNode::set_options(const peer_node_options& new_options) {
+void PeerNode::set_options(const peer_node_options &new_options)
+{
     options = new_options;
 
     download_options download;
@@ -63,24 +85,29 @@ void PeerNode::set_options(const peer_node_options& new_options) {
     upload.chunk_delay_ms = std::max(0, new_options.chunk_delay_ms);
     upload_server->set_upload_options(upload);
 
-    if (!new_options.corrupt_chunks.empty()) {
+    if (!new_options.corrupt_chunks.empty())
+    {
         upload_server->set_corrupt_chunks(new_options.corrupt_chunks);
     }
 }
 
-peer_node_options PeerNode::get_options() const {
+peer_node_options PeerNode::get_options() const
+{
     return options;
 }
 
-bool PeerNode::start() {
+bool PeerNode::start()
+{
     Logger log;
-    if (is_running.exchange(true)) {
+    if (is_running.exchange(true))
+    {
         return true;
     }
 
     log.info("Starting PeerNode [" + peer_id + "] on port " + to_string(port));
 
-    if (!upload_server->start()) {
+    if (!upload_server->start())
+    {
         log.err("Failed to start UploadServer on port " + to_string(port));
         is_running.store(false);
         return false;
@@ -94,33 +121,41 @@ bool PeerNode::start() {
     return true;
 }
 
-void PeerNode::stop() {
+void PeerNode::stop()
+{
     Logger log;
-    if (!is_running.exchange(false)) {
+    if (!is_running.exchange(false))
+    {
         return;
     }
 
     log.info("Stopping PeerNode [" + peer_id + "]...");
 
-    if (download_manager) {
+    if (download_manager)
+    {
         download_manager->request_stop();
     }
-    if (download_thread.joinable()) {
+    if (download_thread.joinable())
+    {
         download_thread.join();
     }
 
-    if (heartbeat_thread.joinable()) {
+    if (heartbeat_thread.joinable())
+    {
         heartbeat_thread.join();
     }
-    if (upload_server) {
+    if (upload_server)
+    {
         upload_server->stop();
     }
 
     log.success("PeerNode stopped cleanly");
 }
 
-void PeerNode::start_heartbeat() {
-    heartbeat_thread = thread([this]() {
+void PeerNode::start_heartbeat()
+{
+    heartbeat_thread = thread([this]()
+                              {
         while (is_running.load()) {
             vector<string> files_to_announce;
             {
@@ -134,19 +169,21 @@ void PeerNode::start_heartbeat() {
             for (int i = 0; i < 30 && is_running.load(); ++i) {
                 this_thread::sleep_for(milliseconds(500));
             }
-        }
-    });
+        } });
 }
 
-bool PeerNode::announce_file(const string& file_id, bool force) {
-    if (file_id.empty()) {
+bool PeerNode::announce_file(const string &file_id, bool force)
+{
+    if (file_id.empty())
+    {
         return false;
     }
 
     {
         lock_guard<mutex> lock(announce_mtx);
         const auto now = steady_clock::now();
-        if (!force && now - last_announce < milliseconds(750)) {
+        if (!force && now - last_announce < milliseconds(750))
+        {
             return true;
         }
         last_announce = now;
@@ -154,7 +191,8 @@ bool PeerNode::announce_file(const string& file_id, bool force) {
 
     announce_request request;
     request.peer_id = peer_id;
-    request.ip = "127.0.0.1";
+    const char *peer_host_env = std::getenv("PEER_HOST");
+    request.ip = peer_host_env && *peer_host_env ? peer_host_env : "127.0.0.1";
     request.port = port;
     request.file_id = file_id;
     request.bitfield = state_manager->get_bitfield(file_id);
@@ -164,10 +202,11 @@ bool PeerNode::announce_file(const string& file_id, bool force) {
     return ok;
 }
 
-void PeerNode::remember_torrent(const string& file_id, const string& file_name,
-                                const string& output_path, const string& mode,
+void PeerNode::remember_torrent(const string &file_id, const string &file_name,
+                                const string &output_path, const string &mode,
                                 size_t file_size, size_t chunk_size,
-                                size_t num_chunks) {
+                                size_t num_chunks)
+{
     managed_torrent_status status;
     status.file_id = file_id;
     status.file_name = file_name;
@@ -181,36 +220,45 @@ void PeerNode::remember_torrent(const string& file_id, const string& file_name,
     torrents[file_id] = status;
 }
 
-void PeerNode::update_torrent_mode(const string& file_id, const string& mode) {
+void PeerNode::update_torrent_mode(const string &file_id, const string &mode)
+{
     lock_guard<mutex> lock(torrents_mtx);
     auto found = torrents.find(file_id);
-    if (found != torrents.end()) {
+    if (found != torrents.end())
+    {
         found->second.mode = mode;
     }
 }
 
-bool PeerNode::seed_file(const string& file_path, size_t chunk_size) {
+bool PeerNode::seed_file(const string &file_path, size_t chunk_size)
+{
     Logger log;
-    if (!filesystem::exists(file_path)) {
+    if (!filesystem::exists(file_path))
+    {
         log.err("Seed file does not exist: " + file_path);
         return false;
     }
 
     const string torrent_path = file_path + ".torrent.json";
     Metadata meta_tool;
-    if (!filesystem::exists(torrent_path)) {
+    if (!filesystem::exists(torrent_path))
+    {
         log.info("Generating metadata for file " + file_path);
         if (!meta_tool.generate_torrent(file_path, chunk_size, torrent_path,
-                                        tracker_url)) {
+                                        tracker_url))
+        {
             log.err("Failed to generate metadata for " + file_path);
             return false;
         }
     }
 
     torrent_info meta;
-    try {
+    try
+    {
         meta = meta_tool.load(torrent_path);
-    } catch (const exception& e) {
+    }
+    catch (const exception &e)
+    {
         log.err("Cannot load torrent metadata: " + string(e.what()));
         return false;
     }
@@ -249,30 +297,37 @@ bool PeerNode::seed_file(const string& file_path, size_t chunk_size) {
     return true;
 }
 
-bool PeerNode::download_file(const string& torrent_path, const string& output_dir) {
+bool PeerNode::download_file(const string &torrent_path, const string &output_dir)
+{
     Logger log;
-    if (download_active.exchange(true)) {
+    if (download_active.exchange(true))
+    {
         log.warnning("A download is already active");
         return false;
     }
     download_success.store(false);
 
-    auto finish_download = [this](bool result) {
+    auto finish_download = [this](bool result)
+    {
         download_active.store(false);
         download_success.store(result);
         return result;
     };
 
-    if (!filesystem::exists(torrent_path)) {
+    if (!filesystem::exists(torrent_path))
+    {
         log.err("Torrent file does not exist: " + torrent_path);
         return finish_download(false);
     }
 
     torrent_info meta;
-    try {
+    try
+    {
         Metadata meta_tool;
         meta = meta_tool.load(torrent_path);
-    } catch (const exception& e) {
+    }
+    catch (const exception &e)
+    {
         log.err("Cannot load torrent metadata: " + string(e.what()));
         return finish_download(false);
     }
@@ -314,7 +369,8 @@ bool PeerNode::download_file(const string& torrent_path, const string& output_di
     announce_file(file_id, true);
 
     download_manager->set_chunk_verified_callback(
-        [this](const string& verified_file_id, int) {
+        [this](const string &verified_file_id, int)
+        {
             // Re-announce the new bitfield, throttled inside announce_file().
             announce_file(verified_file_id, false);
         });
@@ -324,14 +380,17 @@ bool PeerNode::download_file(const string& torrent_path, const string& output_di
 
     download_manager->set_chunk_verified_callback(nullptr);
 
-    if (success) {
+    if (success)
+    {
         record.status = "completed";
         record.downloaded = meta.file_size;
         db->upsert_torrent(record);
         update_torrent_mode(file_id, "completed");
         announce_file(file_id, true);
         log.success("Successfully downloaded file: " + meta.file_name);
-    } else {
+    }
+    else
+    {
         record.status = "incomplete";
         record.downloaded =
             state_manager->get_completed_chunks_count(file_id) * meta.chunk_size;
@@ -343,44 +402,55 @@ bool PeerNode::download_file(const string& torrent_path, const string& output_di
     return finish_download(success);
 }
 
-bool PeerNode::start_download_async(const string& torrent_path,
-                                    const string& output_dir) {
-    if (download_active.load()) {
+bool PeerNode::start_download_async(const string &torrent_path,
+                                    const string &output_dir)
+{
+    if (download_active.load())
+    {
         return false;
     }
-    if (download_thread.joinable()) {
+    if (download_thread.joinable())
+    {
         download_thread.join();
     }
     download_thread =
-        thread([this, torrent_path, output_dir]() {
-            download_file(torrent_path, output_dir);
-        });
+        thread([this, torrent_path, output_dir]()
+               { download_file(torrent_path, output_dir); });
     return true;
 }
 
-void PeerNode::wait_for_download() {
-    if (download_thread.joinable()) {
+void PeerNode::wait_for_download()
+{
+    if (download_thread.joinable())
+    {
         download_thread.join();
     }
 }
 
-void PeerNode::pause_download() {
+void PeerNode::pause_download()
+{
     download_manager->pause_download("");
 }
 
-void PeerNode::resume_download(bool resume) {
-    if (resume) {
+void PeerNode::resume_download(bool resume)
+{
+    if (resume)
+    {
         download_manager->resume_download("");
-    } else {
+    }
+    else
+    {
         download_manager->pause_download("");
     }
 }
 
-void PeerNode::request_stop_download() {
+void PeerNode::request_stop_download()
+{
     download_manager->request_stop();
 }
 
-peer_node_status PeerNode::get_status() const {
+peer_node_status PeerNode::get_status() const
+{
     peer_node_status status;
     status.peer_id = peer_id;
     status.port = port;
@@ -398,18 +468,21 @@ peer_node_status PeerNode::get_status() const {
     {
         lock_guard<mutex> lock(torrents_mtx);
         status.torrents.reserve(torrents.size());
-        for (const auto& entry : torrents) {
+        for (const auto &entry : torrents)
+        {
             managed_torrent_status torrent = entry.second;
             torrent.completed_chunks =
                 state_manager->get_completed_chunks_count(torrent.file_id);
-            if (torrent.num_chunks > 0) {
+            if (torrent.num_chunks > 0)
+            {
                 torrent.progress =
                     100.0 * static_cast<double>(torrent.completed_chunks) /
                     static_cast<double>(torrent.num_chunks);
             }
             if (torrent.mode == "downloading" &&
                 torrent.completed_chunks == torrent.num_chunks &&
-                torrent.num_chunks > 0) {
+                torrent.num_chunks > 0)
+            {
                 torrent.mode = "completed";
             }
             status.torrents.push_back(torrent);
