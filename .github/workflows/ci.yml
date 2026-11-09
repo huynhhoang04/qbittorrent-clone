@@ -48,7 +48,7 @@ jobs:
 
       - name: Install Crow C++ Framework
         run: |
-          sudo wget -q https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h -O /usr/local/include/crow.h
+          sudo wget -q https://github.com/CrowCpp/Crow/releases/download/v1.3.4/crow_all.h -O /usr/local/include/crow.h
 
       - name: Configure CMake
         run: |
@@ -108,7 +108,7 @@ jobs:
       - name: Install Crow C++ Framework (MinGW)
         shell: msys2 {0}
         run: |
-          curl -sSL https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h -o "${MINGW_PREFIX}/include/crow.h"
+          curl -sSL https://github.com/CrowCpp/Crow/releases/download/v1.3.4/crow_all.h -o "${MINGW_PREFIX}/include/crow.h"
 
       - name: Configure CMake
         shell: msys2 {0}
