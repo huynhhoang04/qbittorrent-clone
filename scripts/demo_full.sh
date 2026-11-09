@@ -9,8 +9,18 @@ set -uo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="${QBT_REPO_ROOT:-$(cd "$script_dir/.." && pwd)}"
 build_dir="${QBT_BUILD_DIR:-$repo_root/build}"
-peer_bin="$build_dir/src/peer/PeerApp.exe"
-tracker_bin="$build_dir/src/tracker/TrackerApp.exe"
+resolve_bin() {
+  if [ -f "$1" ]; then
+    echo "$1"
+  elif [ -f "$1.exe" ]; then
+    echo "$1.exe"
+  else
+    echo "$1"
+  fi
+}
+
+peer_bin="$(resolve_bin "$build_dir/src/peer/PeerApp")"
+tracker_bin="$(resolve_bin "$build_dir/src/tracker/TrackerApp")"
 
 for binary in "$peer_bin" "$tracker_bin"; do
   if [ ! -f "$binary" ]; then
@@ -88,6 +98,15 @@ wait_for() {
   return 0
 }
 
+wait_for_file() {
+  local file="$1"
+  for _ in $(seq 1 100); do
+    [ -f "$file" ] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
 peers_json() {
   curl -s -m 3 "http://127.0.0.1:$1/peers?file_id=$2" 2>/dev/null
 }
@@ -158,6 +177,7 @@ scenario_single_source_download() {
     --data-dir "$root/seed" --seed "$root/file.bin" --chunk-size 32768 \
     >"$root/seed.pid"
   local seed_pid; read -r seed_pid <"$root/seed.pid"
+  wait_for_file "$root/file.bin.torrent.json"
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -192,6 +212,7 @@ scenario_multi_source() {
     --data-dir "$root/seedA" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1)"
   seed_b="$(start_peer seedB "$root/seedB.log" --tracker "$url" --port 0 \
     --data-dir "$root/seedB" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1)"
+  wait_for_file "$root/file.bin.torrent.json"
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -232,6 +253,7 @@ scenario_failover() {
     --data-dir "$root/doomed" --seed "$root/file.bin" --chunk-size 32768 --chunk-delay-ms 60)"
   healthy="$(start_peer healthy "$root/healthy.log" --tracker "$url" --port 0 \
     --data-dir "$root/healthy" --seed "$root/file.bin" --chunk-size 32768)"
+  wait_for_file "$root/file.bin.torrent.json"
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -269,6 +291,7 @@ scenario_corruption() {
     --corrupt-chunks 0,1,2,3,4,5,6,7)"
   honest="$(start_peer honest "$root/honest.log" --tracker "$url" --port 0 \
     --data-dir "$root/honest" --seed "$root/file.bin" --chunk-size 32768)"
+  wait_for_file "$root/file.bin.torrent.json"
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -302,6 +325,7 @@ scenario_crash_resume() {
   local seeder
   seeder="$(start_peer seed "$root/seed.log" --tracker "$url" --port 0 \
     --data-dir "$root/seed" --seed "$root/file.bin" --chunk-size 32768 --chunk-delay-ms 80)"
+  wait_for_file "$root/file.bin.torrent.json"
 
   local first_pid
   first_pid="$(start_peer leech1 "$root/leech1.log" --tracker "$url" --port 0 \

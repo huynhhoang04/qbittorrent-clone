@@ -560,10 +560,8 @@ void DownloadManager::peer_worker(shared_ptr<peer_session> session) {
         net_set_timeouts(sock, options.io_timeout_ms);
 
         struct sockaddr_in address {};
-        address.sin_family = AF_INET;
-        address.sin_port = htons(static_cast<uint16_t>(session->peer.port));
-        if (inet_pton(AF_INET, session->peer.ip.c_str(), &address.sin_addr) != 1) {
-            failure = "invalid peer IP address";
+        if (!net_resolve_ipv4(session->peer.ip, session->peer.port, address)) {
+            failure = "invalid peer IP address or hostname";
             break;
         }
 
@@ -1161,10 +1159,8 @@ bool DownloadManager::download_chunk_from_peer(const peer_info_response& peer,
     net_set_timeouts(sock, options.io_timeout_ms);
 
     struct sockaddr_in server_addr {};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(static_cast<uint16_t>(peer.port));
-    if (inet_pton(AF_INET, peer.ip.c_str(), &server_addr.sin_addr) != 1) {
-        log.err("Invalid IP address: " + peer.ip);
+    if (!net_resolve_ipv4(peer.ip, peer.port, server_addr)) {
+        log.err("Invalid IP address or hostname: " + peer.ip);
         close_socket();
         return false;
     }

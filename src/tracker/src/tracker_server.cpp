@@ -17,7 +17,6 @@ namespace
 
         // Dùng contains để kiểm tra an toàn thay cho find() / at()
         if (!body.contains("peer_id") || !body["peer_id"].is_string() ||
-            !body.contains("ip") || !body["ip"].is_string() ||
             !body.contains("file_id") || !body["file_id"].is_string() ||
             !body.contains("bitfield") || !body["bitfield"].is_array() ||
             !body.contains("port"))
@@ -53,7 +52,11 @@ namespace
         }
 
         data.peer_id = body["peer_id"].get<string>();
-        data.ip = body["ip"].get<string>();
+        if (body.contains("ip") && body["ip"].is_string()) {
+            data.ip = body["ip"].get<string>();
+        } else {
+            data.ip = "";
+        }
         data.file_id = body["file_id"].get<string>();
 
         data.bitfield.reserve(bitfield.size());
@@ -116,15 +119,46 @@ void TrackerServer::setup_routes()
                 return crow::response(400, "application/json", "{\"error\":\"Missing or invalid required fields\"}");
             }
 
+            string detected_ip = req.get_header_value("x-forwarded-for");
+            if (detected_ip.empty()) {
+                detected_ip = req.get_header_value("x-real-ip");
+            }
+            if (detected_ip.empty()) {
+                detected_ip = req.remote_ip_address;
+            }
+            if (detected_ip.rfind("::ffff:", 0) == 0) {
+                detected_ip = detected_ip.substr(7);
+            }
+            size_t comma = detected_ip.find(',');
+            if (comma != string::npos) {
+                detected_ip = detected_ip.substr(0, comma);
+            }
+            while (!detected_ip.empty() && (detected_ip.front() == ' ' || detected_ip.front() == '\t')) {
+                detected_ip.erase(0, 1);
+            }
+            while (!detected_ip.empty() && (detected_ip.back() == ' ' || detected_ip.back() == '\t')) {
+                detected_ip.pop_back();
+            }
+
+            string chosen_ip = data.ip;
+            bool is_local_claim = chosen_ip.empty() || chosen_ip == "auto" || chosen_ip == "0.0.0.0" || chosen_ip == "127.0.0.1" || chosen_ip == "localhost";
+            bool remote_is_external = !detected_ip.empty() && detected_ip != "127.0.0.1" && detected_ip != "localhost" && detected_ip != "::1";
+
+            if (is_local_claim && remote_is_external) {
+                chosen_ip = detected_ip;
+            } else if (chosen_ip.empty() || chosen_ip == "auto") {
+                chosen_ip = !detected_ip.empty() ? detected_ip : "127.0.0.1";
+            }
+
             peer_entry entry;
             entry.peer_id = data.peer_id;
-            entry.ip = data.ip.empty() ? req.remote_ip_address : data.ip;
+            entry.ip = chosen_ip;
             entry.port = data.port;
             entry.bitfield = data.bitfield;
             entry.last_seen = chrono::steady_clock::now();
 
             registry.add_or_update(data.file_id, entry);
-            log.info("Announce success from " + entry.peer_id + " for file " + data.file_id);
+            log.info("Announce success from " + entry.peer_id + " (" + entry.ip + ":" + to_string(entry.port) + ") for file " + data.file_id);
             return crow::response(200, "application/json", "{\"status\":\"ok\"}");
         } catch (const exception& e) {
             log.err("Announce error: " + string(e.what()));

@@ -5,6 +5,7 @@
 #include <filesystem>
 
 #include "logger.hpp"
+#include "net.hpp"
 #include "sha256.hpp"
 
 using namespace std;
@@ -191,8 +192,25 @@ bool PeerNode::announce_file(const string &file_id, bool force)
 
     announce_request request;
     request.peer_id = peer_id;
-    const char *peer_host_env = std::getenv("PEER_HOST");
-    request.ip = peer_host_env && *peer_host_env ? peer_host_env : "127.0.0.1";
+
+    string chosen_ip;
+    if (!options.announce_ip.empty()) {
+        chosen_ip = options.announce_ip;
+    } else {
+        const char *peer_host_env = std::getenv("PEER_HOST");
+        if (peer_host_env && *peer_host_env) {
+            chosen_ip = peer_host_env;
+        } else {
+            string detected = net_detect_outbound_ip(tracker_client ? tracker_client->get_host() : "",
+                                                     tracker_client ? tracker_client->get_port() : 80);
+            if (!detected.empty() && detected != "127.0.0.1") {
+                chosen_ip = detected;
+            } else {
+                chosen_ip = "127.0.0.1";
+            }
+        }
+    }
+    request.ip = chosen_ip;
     request.port = port;
     request.file_id = file_id;
     request.bitfield = state_manager->get_bitfield(file_id);
@@ -473,6 +491,7 @@ peer_node_status PeerNode::get_status() const
             managed_torrent_status torrent = entry.second;
             torrent.completed_chunks =
                 state_manager->get_completed_chunks_count(torrent.file_id);
+            torrent.bitfield = state_manager->get_bitfield(torrent.file_id);
             if (torrent.num_chunks > 0)
             {
                 torrent.progress =

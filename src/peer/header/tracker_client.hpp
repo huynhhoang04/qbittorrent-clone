@@ -22,4 +22,7 @@ class TrackerClient {
         bool announce(const announce_request& req);
         vector<peer_info_response> get_peers(const string& file_id);
         bool health_check();
+        string get_host() const { return host; }
+        int get_port() const { return port; }
+        string get_tracker_url() const { return tracker_url; }
 };

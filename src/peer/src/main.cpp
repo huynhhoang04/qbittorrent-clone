@@ -5,6 +5,7 @@
 #include "logger.hpp"
 #include "peer_node.hpp"
 #include "tui.hpp"
+#include "web_ui.hpp"
 
 using namespace std;
 
@@ -65,9 +66,12 @@ namespace
         cout << "  --io-timeout-ms <n>      Socket timeout in milliseconds (default 4000)\n";
         cout << "  --chunk-delay-ms <n>     Artificial delay before serving each chunk (tests)\n";
         cout << "  --corrupt-chunks <list>  Comma-separated chunk indexes to corrupt on upload\n";
+        cout << "  --announce-ip <ip/host>  Advertised IP or hostname to announce to tracker\n";
         cout << "  --exit-after-download    Exit once the download completes or fails\n";
         cout << "  --tui                    Enable the ncurses dashboard\n";
         cout << "  --headless               Disable the dashboard (default)\n";
+        cout << "  --webui                  Enable the web browser dashboard (default port 8081)\n";
+        cout << "  --webui-port <port>      Port for the web dashboard (default: 8081)\n";
         cout << "  --help, -h               Show this help\n";
     }
 
@@ -165,9 +169,18 @@ int main(int argc, char *argv[])
         {
             parsed_options.enable_tui = true;
         }
-        else if (arg == "--headless")
+        else if (arg == "--announce-ip")
         {
-            parsed_options.enable_tui = false;
+            parsed_options.announce_ip = next_value("--announce-ip");
+        }
+        else if (arg == "--webui")
+        {
+            parsed_options.enable_webui = true;
+        }
+        else if (arg == "--webui-port")
+        {
+            parsed_options.webui_port = stoi(next_value("--webui-port"));
+            parsed_options.enable_webui = true;
         }
         else if (arg == "--help" || arg == "-h")
         {
@@ -206,6 +219,26 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    unique_ptr<WebUiServer> web_ui;
+    if (options.enable_webui)
+    {
+        web_ui = make_unique<WebUiServer>(node, options.webui_port);
+        if (!options.enable_tui)
+        {
+            Logger::set_sink([&web_ui](log_level level, const string &message) {
+                const char* lvl = log_level_name(level);
+                cout << "[" << lvl << "] " << message << "\n";
+                if (web_ui) {
+                    web_ui->add_log(string("[") + lvl + "] " + message);
+                }
+            });
+        }
+        if (web_ui->start())
+        {
+            log.success("Web UI Dashboard running at http://localhost:" + to_string(options.webui_port));
+        }
+    }
+
     bool setup_ok = true;
     if (!seed_path.empty())
     {
@@ -215,7 +248,7 @@ int main(int argc, char *argv[])
     bool download_ok = true;
     if (!download_path.empty())
     {
-        if (options.enable_tui)
+        if (options.enable_tui || options.enable_webui)
         {
             if (!node.start_download_async(download_path, output_dir))
             {
@@ -279,6 +312,12 @@ int main(int argc, char *argv[])
     {
         watcher.join();
     }
+
+    if (web_ui)
+    {
+        web_ui->stop();
+    }
+    Logger::clear_sink();
 
     log.success("PeerApp exited cleanly");
     return exit_code;

@@ -55,3 +55,25 @@ TEST(ProtocolTest, JSONSerializeDeserialize) {
     EXPECT_EQ(req.file_id, req_out.file_id);
     EXPECT_EQ(req.bitfield, req_out.bitfield);
 }
+
+#include "net.hpp"
+
+TEST(NetTest, ResolveIPv4NumericAndHostnames) {
+    sockaddr_in addr{};
+    EXPECT_TRUE(net_resolve_ipv4("127.0.0.1", 8080, addr));
+    EXPECT_EQ(addr.sin_port, htons(8080));
+    EXPECT_EQ(addr.sin_family, AF_INET);
+
+    EXPECT_TRUE(net_resolve_ipv4("localhost", 6881, addr));
+    EXPECT_EQ(addr.sin_port, htons(6881));
+
+    EXPECT_FALSE(net_resolve_ipv4("", 8080, addr));
+    EXPECT_FALSE(net_resolve_ipv4("127.0.0.1", -1, addr));
+    EXPECT_FALSE(net_resolve_ipv4("127.0.0.1", 70000, addr));
+}
+
+TEST(NetTest, DetectOutboundIP) {
+    string ip = net_detect_outbound_ip("127.0.0.1", 8080);
+    EXPECT_FALSE(ip.empty());
+}
+

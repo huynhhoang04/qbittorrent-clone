@@ -241,3 +241,97 @@ std::string net_last_error() {
     return std::string(std::strerror(errno));
 #endif
 }
+
+bool net_resolve_ipv4(const std::string& host, int port, struct sockaddr_in& out) {
+    if (host.empty() || port <= 0 || port > 65535) {
+        return false;
+    }
+    std::memset(&out, 0, sizeof(out));
+    out.sin_family = AF_INET;
+    out.sin_port = htons(static_cast<uint16_t>(port));
+
+    // Fast-path: numeric IPv4 string
+    if (inet_pton(AF_INET, host.c_str(), &out.sin_addr) == 1) {
+        return true;
+    }
+
+    // Fallback: hostname / DNS resolution
+    net_init();
+    struct addrinfo hints{};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    struct addrinfo* res = nullptr;
+
+    const std::string port_str = std::to_string(port);
+    if (getaddrinfo(host.c_str(), port_str.c_str(), &hints, &res) != 0 || res == nullptr) {
+        return false;
+    }
+
+    bool ok = false;
+    for (struct addrinfo* ptr = res; ptr != nullptr; ptr = ptr->ai_next) {
+        if (ptr->ai_family == AF_INET && ptr->ai_addr != nullptr) {
+            std::memcpy(&out, ptr->ai_addr, sizeof(struct sockaddr_in));
+            out.sin_port = htons(static_cast<uint16_t>(port));
+            ok = true;
+            break;
+        }
+    }
+    freeaddrinfo(res);
+    return ok;
+}
+
+std::string net_detect_outbound_ip(const std::string& target_host, int target_port) {
+    net_init();
+    socket_t s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (!net_valid(s)) {
+        return "";
+    }
+
+    std::string host = target_host.empty() ? "8.8.8.8" : target_host;
+    int port = target_port <= 0 ? 53 : target_port;
+
+    if (host == "localhost" || host == "127.0.0.1" || host == "::1") {
+        host = "8.8.8.8";
+        port = 53;
+    }
+
+    struct sockaddr_in dest{};
+    if (!net_resolve_ipv4(host, port, dest)) {
+        if (host != "8.8.8.8") {
+            if (!net_resolve_ipv4("8.8.8.8", 53, dest)) {
+                net_close(s);
+                return "";
+            }
+        } else {
+            net_close(s);
+            return "";
+        }
+    }
+
+    if (connect(s, reinterpret_cast<const struct sockaddr*>(&dest), sizeof(dest)) < 0) {
+        net_close(s);
+        return "";
+    }
+
+    struct sockaddr_in local{};
+#ifdef _WIN32
+    int len = sizeof(local);
+#else
+    socklen_t len = sizeof(local);
+#endif
+    if (getsockname(s, reinterpret_cast<struct sockaddr*>(&local), &len) < 0) {
+        net_close(s);
+        return "";
+    }
+    net_close(s);
+
+    char ip_buf[INET_ADDRSTRLEN] = {0};
+    if (inet_ntop(AF_INET, &local.sin_addr, ip_buf, sizeof(ip_buf)) != nullptr) {
+        std::string ip_str(ip_buf);
+        if (!ip_str.empty() && ip_str != "0.0.0.0") {
+            return ip_str;
+        }
+    }
+    return "";
+}
+
