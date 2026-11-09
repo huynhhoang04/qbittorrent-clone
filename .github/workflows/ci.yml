@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat*/**'
+      - 'feature*/**'
+      - 'fix*/**'
+      - 'chore*/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # 1. UBUNTU LINUX BUILD & TEST
+  # =========================================================================
+  ubuntu:
+    name: Ubuntu (GCC / Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libsqlite3-dev \
+            libssl-dev \
+            nlohmann-json3-dev \
+            libncurses-dev \
+            libgtest-dev \
+            libboost-all-dev \
+            libasio-dev \
+            curl \
+            wget
+
+      - name: Install Crow C++ Framework
+        run: |
+          sudo wget -q https://github.com/CrowCpp/Crow/releases/download/v1.3.4/crow_all.h -O /usr/local/include/crow.h
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S . -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build project (PeerApp, TrackerApp, TestAll)
+        run: |
+          cmake --build build -j$(nproc)
+
+      - name: Run CTest (Unit & Integration Tests)
+        run: |
+          ctest --test-dir build --output-on-failure
+
+      - name: Run Full 7-Scenario Demo Script
+        run: |
+          bash scripts/demo_full.sh
+
+      - name: Upload Linux Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbittorrent-clone-linux
+          path: |
+            build/src/peer/PeerApp
+            build/src/tracker/TrackerApp
+          if-no-files-found: error
+
+  # =========================================================================
+  # 2. WINDOWS MINGW-W64 BUILD & TEST
+  # =========================================================================
+  windows:
+    name: Windows (MinGW-w64 / MSYS2)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 and MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-nlohmann-json
+            mingw-w64-x86_64-ncurses
+            mingw-w64-x86_64-gtest
+            mingw-w64-x86_64-asio
+            mingw-w64-x86_64-boost
+            curl
+
+      - name: Install Crow C++ Framework (MinGW)
+        shell: msys2 {0}
+        run: |
+          curl -sSL https://github.com/CrowCpp/Crow/releases/download/v1.3.4/crow_all.h -o "${MINGW_PREFIX}/include/crow.h"
+
+      - name: Configure CMake
+        shell: msys2 {0}
+        run: |
+          cmake -B build -S . -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build project (PeerApp, TrackerApp, TestAll)
+        shell: msys2 {0}
+        run: |
+          cmake --build build -j$(nproc)
+
+      - name: Run CTest (Unit & Integration Tests)
+        shell: msys2 {0}
+        run: |
+          ctest --test-dir build --output-on-failure
+
+      - name: Upload Windows Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbittorrent-clone-windows
+          path: |
+            build/src/peer/PeerApp.exe
+            build/src/tracker/TrackerApp.exe
+          if-no-files-found: error
