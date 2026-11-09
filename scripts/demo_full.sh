@@ -209,10 +209,16 @@ scenario_multi_source() {
   # completed transfer that reports two contributors really used both sources.
   local seed_a seed_b
   seed_a="$(start_peer seedA "$root/seedA.log" --tracker "$url" --port 0 \
-    --data-dir "$root/seedA" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1)"
+    --data-dir "$root/seedA" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1 --chunk-delay-ms 10)"
   seed_b="$(start_peer seedB "$root/seedB.log" --tracker "$url" --port 0 \
-    --data-dir "$root/seedB" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1)"
+    --data-dir "$root/seedB" --seed "$root/file.bin" --chunk-size 32768 --max-uploads 1 --chunk-delay-ms 10)"
   wait_for_file "$root/file.bin.torrent.json"
+  for _ in $(seq 1 60); do
+    seen="$(peers_json "$port" "$id")"
+    count="$(echo "$seen" | grep -o '"peer_id"' | wc -l | tr -d ' ')"
+    [ "${count:-0}" -ge 2 ] && break
+    sleep 0.25
+  done
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -254,6 +260,12 @@ scenario_failover() {
   healthy="$(start_peer healthy "$root/healthy.log" --tracker "$url" --port 0 \
     --data-dir "$root/healthy" --seed "$root/file.bin" --chunk-size 32768)"
   wait_for_file "$root/file.bin.torrent.json"
+  for _ in $(seq 1 40); do
+    seen="$(peers_json "$port" "$id")"
+    count="$(echo "$seen" | grep -o '"peer_id"' | wc -l | tr -d ' ')"
+    [ "${count:-0}" -ge 2 ] && break
+    sleep 0.25
+  done
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -288,10 +300,16 @@ scenario_corruption() {
   local poison honest
   poison="$(start_peer poison "$root/poison.log" --tracker "$url" --port 0 \
     --data-dir "$root/poison" --seed "$root/file.bin" --chunk-size 32768 \
-    --corrupt-chunks 0,1,2,3,4,5,6,7)"
+    --corrupt-chunks 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31)"
   honest="$(start_peer honest "$root/honest.log" --tracker "$url" --port 0 \
     --data-dir "$root/honest" --seed "$root/file.bin" --chunk-size 32768)"
   wait_for_file "$root/file.bin.torrent.json"
+  for _ in $(seq 1 40); do
+    seen="$(peers_json "$port" "$id")"
+    count="$(echo "$seen" | grep -o '"peer_id"' | wc -l | tr -d ' ')"
+    [ "${count:-0}" -ge 2 ] && break
+    sleep 0.25
+  done
 
   local leech_pid
   leech_pid="$(start_peer leech "$root/leech.log" --tracker "$url" --port 0 \
@@ -403,9 +421,11 @@ scenario_tracker_expiry() {
   make_source "$root/file.bin" 64 7
   local id; id="$(sha "$root/file.bin")"
 
-  local victim
-  victim="$(start_peer gone "$root/gone.log" --tracker "$url" --port 0 \
-    --data-dir "$root/gone" --seed "$root/file.bin" --chunk-size 32768)"
+  start_peer gone "$root/gone.log" --tracker "$url" --port 0 \
+    --data-dir "$root/gone" --seed "$root/file.bin" --chunk-size 32768 \
+    >"$root/gone.pid"
+  local victim; read -r victim <"$root/gone.pid"
+  victim="$(echo "$victim" | tr -dc '0-9')"
   for _ in $(seq 1 40); do
     peers_json "$port" "$id" | grep -q '"peer_id"' && break
     sleep 0.5
@@ -417,6 +437,7 @@ scenario_tracker_expiry() {
   fi
 
   "$script_dir/inject_fault.sh" "$victim" crash >"$root/fault.log" 2>&1
+  kill -9 "$victim" >/dev/null 2>&1 || true
 
   local start now elapsed=""
   start="$(date +%s)"
