@@ -14,8 +14,10 @@ shift 3
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="${QBT_REPO_ROOT:-$(cd "$script_dir/.." && pwd)}"
-build_dir="${QBT_BUILD_DIR:-$repo_root/build}"
-peer_bin="${QBT_PEER_BIN:-$build_dir/src/peer/PeerApp.exe}"
+peer_bin="${QBT_PEER_BIN:-$build_dir/src/peer/PeerApp}"
+if [ ! -f "$peer_bin" ] && [ -f "${peer_bin}.exe" ]; then
+  peer_bin="${peer_bin}.exe"
+fi
 
 if [ ! -f "$peer_bin" ]; then
   echo "peer binary not found: $peer_bin" >&2

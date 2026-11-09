@@ -6,8 +6,10 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="${QBT_REPO_ROOT:-$(cd "$script_dir/.." && pwd)}"
-build_dir="${QBT_BUILD_DIR:-$repo_root/build}"
-tracker_bin="${QBT_TRACKER_BIN:-$build_dir/src/tracker/TrackerApp.exe}"
+tracker_bin="${QBT_TRACKER_BIN:-$build_dir/src/tracker/TrackerApp}"
+if [ ! -f "$tracker_bin" ] && [ -f "${tracker_bin}.exe" ]; then
+  tracker_bin="${tracker_bin}.exe"
+fi
 
 port="${1:-8080}"
 

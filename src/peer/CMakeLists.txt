@@ -23,6 +23,22 @@ else()
     find_package(Curses REQUIRED)
 endif()
 
+if(NOT TARGET Crow::Crow)
+    find_path(CROW_INCLUDE_DIR crow.h)
+    find_path(ASIO_INCLUDE_DIR asio.hpp)
+    if(CROW_INCLUDE_DIR)
+        add_library(Crow::Crow INTERFACE IMPORTED)
+        target_include_directories(Crow::Crow INTERFACE ${CROW_INCLUDE_DIR})
+        if(ASIO_INCLUDE_DIR)
+            target_include_directories(Crow::Crow INTERFACE ${ASIO_INCLUDE_DIR})
+            target_compile_definitions(Crow::Crow INTERFACE ASIO_STANDALONE)
+        endif()
+        target_link_libraries(Crow::Crow INTERFACE Threads::Threads)
+    else()
+        find_package(Crow REQUIRED)
+    endif()
+endif()
+
 add_library(PeerLib STATIC 
     src/file_manager.cpp 
     src/database.cpp
@@ -32,10 +48,14 @@ add_library(PeerLib STATIC
     src/download_manager.cpp
     src/peer_node.cpp
     src/tui.cpp
+    src/web_ui.cpp
 )
 
-target_link_libraries(PeerLib PUBLIC CommonLib SQLite::SQLite3 Threads::Threads)
+target_link_libraries(PeerLib PUBLIC CommonLib SQLite3::SQLite3 Threads::Threads Crow::Crow)
 target_link_libraries(PeerLib PUBLIC ${CURSES_LIBRARIES})
+if(WIN32)
+    target_link_libraries(PeerLib PUBLIC mswsock ws2_32)
+endif()
 target_include_directories(PeerLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/header)
 target_include_directories(PeerLib PUBLIC ${CURSES_INCLUDE_DIRS})
 

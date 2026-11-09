@@ -14,6 +14,7 @@ using namespace std;
 
 struct peer_node_options
 {
+    string announce_ip; // Custom IP or hostname to announce to tracker
     int max_active_downloads = 5;
     int max_active_uploads = 5;
     int pipeline_depth = 3;
@@ -21,6 +22,8 @@ struct peer_node_options
     int chunk_delay_ms = 0;
     bool exit_after_download = false;
     bool enable_tui = false;
+    bool enable_webui = false;
+    int webui_port = 8081;
     vector<int> corrupt_chunks;
 };
 
@@ -35,6 +38,7 @@ struct managed_torrent_status
     size_t num_chunks = 0;
     size_t completed_chunks = 0;
     double progress = 0.0;
+    vector<bool> bitfield;
 };
 
 struct peer_node_status
@@ -128,5 +132,6 @@ public:
     string get_peer_id() const { return peer_id; }
     int get_port() const { return port; }
     string get_data_dir() const { return data_dir; }
+    string get_tracker_url() const { return tracker_url; }
     bool exit_after_download() const { return options.exit_after_download; }
 };

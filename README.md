@@ -28,6 +28,39 @@ ctest --output-on-failure
 ./tests/TestAll
 ```
 
+Chạy toàn bộ 7 kịch bản Demo tự động:
+```bash
+./scripts/demo_full.sh
+```
+
+---
+
+## 🌐 Khởi Chạy Web UI Dashboard & Export Node Ra LAN / Internet
+
+### 1. Bật Tracker Server
+```bash
+./build/src/tracker/TrackerApp -p 8080
+```
+
+### 2. Bật Peer Node kèm Web UI Dashboard (Trình duyệt)
+Mở giao diện Web tại `http://localhost:8081` (hoặc cổng bất kỳ tùy chọn bằng `--webui-port`):
+```bash
+./build/src/peer/PeerApp --tracker http://localhost:8080 -p 6881 --webui --webui-port 8081
+```
+
+- **Piece Map Grid**: Quan sát từng chunk xanh/xám được kiểm tra toàn vẹn SHA-256 theo thời gian thực.
+- **Thao tác chuột**: Upload file trực tiếp từ trình duyệt để tự động tạo `.torrent.json` và Seed, hoặc upload `.torrent.json` để tải về máy.
+- **Quản trị Swarm**: Bật/tắt Pause, Resume, xem tốc độ Down/Up mượt mà.
+
+### 3. Export Node ra LAN / Internet (WAN)
+Hệ thống đã hỗ trợ tự động nhận diện IP card mạng thật và giải phân giải DNS/Hostname:
+- Tự động nhận diện Outbound IP card mạng (không cần cấu hình).
+- Hoặc chủ động khai báo IP/Domain công khai:
+  ```bash
+  ./build/src/peer/PeerApp --tracker http://my-tracker-domain.com:8080 --announce-ip 100.x.y.z --webui
+  ```
+  *(Cũng có thể dùng biến môi trường `PEER_HOST=100.x.y.z`).*
+
 ---
 
 ## 🚀 Hướng Dẫn Quy Trình Làm Việc Nhóm (Team Workflow)

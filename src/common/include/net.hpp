@@ -63,3 +63,9 @@ bool net_recv_exact(socket_t s, void* data, std::size_t length);
 int net_recv_some(socket_t s, void* data, std::size_t length);
 
 std::string net_last_error();
+
+// Resolves an IPv4 address or hostname to sockaddr_in.
+bool net_resolve_ipv4(const std::string& host, int port, struct sockaddr_in& out);
+
+// Determines the outbound local IP address used to reach target_host.
+std::string net_detect_outbound_ip(const std::string& target_host = "", int target_port = 80);
