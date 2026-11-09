@@ -1,0 +1,59 @@
+# ==========================================
+# STAGE 1: MÔI TRƯỜNG BIÊN DỊCH (BUILDER)
+# ==========================================
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Cài đặt các công cụ build. Bổ sung libncurses-dev để compile giao diện đồ họa Terminal
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    wget \
+    libsqlite3-dev \
+    libssl-dev \
+    nlohmann-json3-dev \
+    libncurses5-dev libncursesw5-dev \
+    libgtest-dev \
+    libboost-all-dev
+
+# 2. Cài đặt Crow Framework (Peer cũng cần Crow để mở UploadServer)
+RUN wget https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h -O /usr/local/include/crow.h
+
+WORKDIR /app
+# 3. Copy toàn bộ mã nguồn vào
+COPY . .
+
+# 4. Biên dịch dự án
+# Lệnh find này sẽ rà soát trong thư mục build để lôi đúng file chạy của Peer (có thể tên là PeerNode hoặc peer) ra ngoài.
+RUN rm -rf build && mkdir -p build && cd build && cmake .. && make -j$(nproc) && \
+    find /app/build -type f \( -iname "PeerApp" -o -iname "peer" \) -exec cp {} /app/PeerApp_bin \;
+
+# ==========================================
+# STAGE 2: MÔI TRƯỜNG CHẠY (RUNTIME) - SIÊU NHẸ
+# ==========================================
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. CHỈ cài các thư viện chuẩn theo yêu cầu Issue 15 (Bao gồm libncurses6)
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    libsqlite3-0 \
+    libncurses6 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 2. Bế đúng file chạy từ Stage 1 sang
+COPY --from=builder /app/PeerApp_bin /app/PeerApp
+
+# 3. Phân quyền thực thi
+RUN chmod +x /app/PeerApp
+
+# 4. Mở cổng kết nối P2P (Theo log của bạn hôm qua là cổng 6881)
+EXPOSE 6881
+
+# 5. Khởi chạy Peer
+CMD ["./PeerApp"]

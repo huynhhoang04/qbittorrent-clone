@@ -1,0 +1,63 @@
+services:
+  tracker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.tracker
+    container_name: p2p_tracker
+    ports:
+      - "8080:8080"
+    networks:
+      - p2p_network
+    hostname: tracker
+
+  peer-seeder:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.peer
+    container_name: p2p_peer_seeder
+    environment:
+      - TRACKER_URL=http://tracker:8080
+      - PEER_HOST=peer-seeder
+    volumes:
+      - ../data/seeder:/app/data
+    networks:
+      - p2p_network
+    hostname: peer-seeder
+    depends_on:
+      - tracker
+
+  peer-leecher-1:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.peer
+    container_name: p2p_peer_leecher_1
+    environment:
+      - TRACKER_URL=http://tracker:8080
+      - PEER_HOST=peer-leecher-1
+    volumes:
+      - ../data/leecher1:/app/data
+    networks:
+      - p2p_network
+    hostname: peer-leecher-1
+    depends_on:
+      - tracker
+
+  peer-leecher-2:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.peer
+    container_name: p2p_peer_leecher_2
+    environment:
+      - TRACKER_URL=http://tracker:8080
+      - PEER_HOST=peer-leecher-2
+    volumes:
+      - ../data/leecher2:/app/data
+    networks:
+      - p2p_network
+    hostname: peer-leecher-2
+    depends_on:
+      - tracker
+
+networks:
+  p2p_network:
+    driver: bridge

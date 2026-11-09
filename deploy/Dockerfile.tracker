@@ -1,0 +1,58 @@
+# ==========================================
+# STAGE 1: MÔI TRƯỜNG BIÊN DỊCH (BUILDER)
+# ==========================================
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Cài đặt các thư viện nặng dùng để build code C++
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    wget \
+    libsqlite3-dev \
+    libssl-dev \
+    nlohmann-json3-dev \
+    libncurses5-dev libncursesw5-dev \
+    libgtest-dev \
+    libboost-all-dev
+
+# 2. Cài đặt Crow Framework
+RUN wget https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h -O /usr/local/include/crow.h
+
+WORKDIR /app
+# 3. Copy toàn bộ mã nguồn vào container
+COPY . .
+
+# 4. Biên dịch dự án
+# Lệnh find dùng để tự động tìm file TrackerApp (dù CMake có lưu ở thư mục con nào) và chép ra ngoài để dễ lấy.
+RUN rm -rf build && mkdir -p build && cd build && cmake .. && make -j$(nproc) && \
+    find /app/build -type f -name "TrackerApp" -exec cp {} /app/TrackerApp_bin \;
+
+# ==========================================
+# STAGE 2: MÔI TRƯỜNG CHẠY (RUNTIME) - SIÊU NHẸ
+# ==========================================
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. CHỈ cài các thư viện runtime gọn nhẹ mà Issue 15 yêu cầu
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    libsqlite3-0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 2. Lấy đúng file chạy TrackerApp từ Stage 1 sang (bỏ lại toàn bộ rác rưởi của quá trình build)
+COPY --from=builder /app/TrackerApp_bin /app/TrackerApp
+
+# 3. Phân quyền thực thi
+RUN chmod +x /app/TrackerApp
+
+# 4. Mở cổng 8080 theo yêu cầu
+EXPOSE 8080
+
+# 5. Khởi chạy Tracker
+CMD ["./TrackerApp"]
