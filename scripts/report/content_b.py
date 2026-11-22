@@ -245,9 +245,9 @@ def section_14_testing():
         table(
             ["Nhóm", "Tệp", "Số bài", "Nội dung chính"],
             [
-                ("Chức năng", "test_sha256, test_metadata, test_file_manager, test_protocol, test_database, test_state_manager, test_peer_registry, test_tracker_server", "17", "Băm, sinh/đọc metadata, đọc-ghi mảnh, roundtrip khung tin, CRUD SQLite, bitfield, registry, end-to-end tracker"),
+                ("Chức năng", "test_sha256 (2), test_metadata (1), test_file_manager (1), test_protocol (6, gồm 2 NetTest), test_database (3), test_state_manager (1), test_peer_registry (5), test_tracker_server (1)", "20", "Băm, sinh/đọc metadata, đọc-ghi mảnh, roundtrip khung tin, CRUD SQLite, bitfield, registry, end-to-end tracker"),
                 ("Đồng thời", "test_concurrent_download", "9", "2 seeder/1 leecher, 1 seeder/2 leecher, leecher phục vụ leecher, full-duplex, giới hạn slot, peer tham gia muộn, stress lặp, giao dịch cổng"),
-                ("Lỗi và phục hồi", "test_fault_recovery", "4", "seeder chết giữa chừng, chỉ có nguồn hỏng, resume sau kill (Windows)"),
+                ("Lỗi và phục hồi", "test_fault_recovery", "4 khai báo<br/>(3 chạy + 1 chỉ Windows)", "seeder chết giữa chừng, chỉ có nguồn hỏng, resume sau kill"),
                 ("Bảo mật / dữ liệu sai", "test_invalid_data", "10", "khung quá lớn, khung cụt, handshake sai, cổng ngoài phạm vi, chỉ số ngoài phạm vi, không treo"),
                 ("Hiệu năng", "scripts/bench.sh", "9 cấu hình", "3 nguồn × 3 kích thước × 6 cấu hình đồng thời (mục 15)"),
             ],
@@ -257,11 +257,11 @@ def section_14_testing():
         spacer(2),
         h2("14.2. Kết quả chạy"),
         rich(
-            "Chạy `ctest --output-on-failure` trên bản build Debug có ASan + UBSan: **42/42 bài được đăng ký, 41 bài "
+            "Chạy `ctest --output-on-failure` trên bản build Debug có ASan + UBSan: **42 bài được đăng ký, 41 bài "
             "chạy và đạt, 1 bài bị bỏ qua có chủ đích.** Bài bị bỏ qua là "
             "`RealProcessCrashResumesFromPersistedSqliteState`, chỉ biên dịch trên Windows vì cần kill tiến trình con "
             "theo cách Windows; trên Linux, cùng hành vi này được kiểm chứng bởi kịch bản demo 6 (mục 14.3). Toàn bộ "
-            "chạy hoàn tất trong 7,84 giây."
+            "chạy hoàn tất trong 7,63 giây."
         ),
         code(
             """$ ctest --output-on-failure
@@ -269,7 +269,7 @@ def section_14_testing():
 41/42 Test #41: FaultRecoveryTest.CorruptedOnlySourceIsRejectedAndDownloadFails  Passed  2.36 sec
 42/42 Test #42: FaultRecoveryTest.RealProcessCrashResumesFromPersistedSqliteState  ***Skipped
 100% tests passed out of 42
-Total Test time (real) =   7.84 sec"""
+Total Test time (real) =   7.63 sec"""
         ),
         rich(
             "Một điểm đáng chú ý về **thời gian chạy test**: bộ test không chỉ kiểm tra hàm thuần mà còn khởi động "

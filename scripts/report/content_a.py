@@ -131,11 +131,11 @@ def section_2_task_assignment(doc):
             "responsible for a specific part” của đề bài."
         ),
         rich(
-            "**Cách tính đóng góp.** Ở thời điểm nộp bài, kho có 34 commit trên `main`: 17 commit của "
-            "`giaback`, 14 commit của `huynhhoang04` (8 dưới tên `huynhhoang04`, 6 dưới tên cấu hình "
-            "`Em huynh`), 3 commit của `TruongQuynh` (tài khoản `TruongNguyen2703`). Số commit không "
-            "phản ánh đầy đủ khối lượng: các PR #19 và #20 của `giaback` mang phần lớn logic tải song song "
-            "và chịu lỗi, còn các PR #22–#24 của `TruongNguyen2703` tập trung vào hạ tầng và độ ổn định."
+            "**Cách tính đóng góp.** Ở thời điểm nộp bài, nhánh `main` trên GitHub có 35 commit: 17 commit của "
+            "`giaback`, 15 của `huynhhoang04` (8 dưới tên `huynhhoang04`, 7 dưới tên hiển thị `Em huynh` — cùng một "
+            "tài khoản), và 3 của `TruongQuynh` (tài khoản `TruongNguyen2703`). Số commit không phản ánh đầy đủ "
+            "khối lượng: các PR #19 và #20 của `giaback` mang phần lớn logic tải song song và chịu lỗi, còn các "
+            "PR #22–#24 của `TruongNguyen2703` tập trung vào hạ tầng và độ ổn định."
         ),
         spacer(3),
         h2("2.1. Phân chia theo mốc"),
