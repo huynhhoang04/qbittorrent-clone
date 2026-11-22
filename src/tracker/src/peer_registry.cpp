@@ -72,7 +72,6 @@ vector<peer_entry> PeerRegistry::get_peers(const string &file_id)
 
 void PeerRegistry::cleanup_stale(int timeout_seconds)
 {
-    Logger log;
     lock_guard<mutex> lock(mtx);
 
     auto now = chrono::steady_clock::now();

@@ -1,0 +1,108 @@
+{
+  "recorded_at": "2026-11-22T09:30:10+07:00",
+  "source_commit": "72a5d0c6c163e33fad2a73ee98d5197769792613",
+  "source_tree_sha256": "8f417e1a9988d9219ef04338374587d1a385fa1266d027340f7521e48518803f",
+  "environment": {
+    "os": "Linux-7.1.5-arch1-2-x86_64-with-glibc2.44",
+    "compiler": "c++ (GCC) 16.1.1 20260728"
+  },
+  "release": {
+    "registered": 48,
+    "passed": 47,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_seconds": 6.06
+  },
+  "debug_asan_ubsan": {
+    "registered": 48,
+    "passed": 47,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_seconds": 8.39
+  },
+  "automated_demos": {
+    "passed": 7,
+    "failed": 0
+  },
+  "web_smoke": {
+    "passed": 15,
+    "failed": 0
+  },
+  "benchmark": {
+    "configurations": 12,
+    "verified": 12
+  },
+  "docker_compose": {
+    "config_valid": true,
+    "container_runtime_tested": false,
+    "reason": "Docker daemon is not running; starting the system service requires a sudo password."
+  },
+  "windows": "Not executed locally; covered by the GitHub Actions Windows job after push.",
+  "source_files": {
+    "src/common/CMakeLists.txt": "74b7554915abcf9be2ee38708e57a9256adea0c0fdf4c2abcd2df0f078531794",
+    "src/common/include/env.hpp": "6e172ea8eb5b78db8ed086526cad3e3a324fdad558fec7069f1ad28eaafc63c2",
+    "src/common/include/logger.hpp": "99b719d050adbd46ef4c34da9d38c6f98b6936978fd5e9a4bd825aaf8d14e34e",
+    "src/common/include/metadata.hpp": "37da1eaf20ed743ae9d76c24ce4384f2d32937e0389ca02c28fb61a2107b5b57",
+    "src/common/include/net.hpp": "6c4688b27d6ba337ebb6af85cd69af61bd2419fa33519f54859dcf3aa7342025",
+    "src/common/include/protocol.hpp": "96db19167724b93f56e69e00a50d8975b2194afb6c809ebe4f86c48cdba345e7",
+    "src/common/include/sha256.hpp": "9b6f57f9665ec703ac0662a6a402f9bafa634374c532b3c76e9142a681b77dee",
+    "src/common/src/env.cpp": "6226240d4fea1c0a22ac5067a65d085bddeb84d1028ea75294622d2209a737b3",
+    "src/common/src/logger.cpp": "708582f67dec71fac73f7819de247c7fc5a9edf4e246328b237b299e193826b6",
+    "src/common/src/metadata.cpp": "2db7c6f67e35b75d4813a7607b4aa105c2080ba1dd031233e039b10db1cf5a82",
+    "src/common/src/net.cpp": "c5db6089fef39f43a8b12331456f6ff18b09fdd73244761532606ed41872e601",
+    "src/common/src/protocol.cpp": "515175420d9c08391a8d710100d61f7d4434b46b89a507405073e8e6268389ef",
+    "src/common/src/sha256.cpp": "583d050e6b89e663c486d568b1fc1280fbb0a1ff2297b8008409b34eb3be6a9d",
+    "src/peer/CMakeLists.txt": "05b5111d9302ffd17e154bf76768a9badb3c567072a281eb3a3938b25483b54b",
+    "src/peer/header/database.hpp": "cd9e39cad35955e5f7d10f3b9bd4e96d355f23b70f9355b3790b296103dde863",
+    "src/peer/header/download_manager.hpp": "e5f843d8ad4a0506d9263f1759da0c4fa1099a27773b569193ca4bd8d9c19c75",
+    "src/peer/header/file_manager.hpp": "349c24b1bbfa3c5a325d864bccd3053e2e730410225ca0e379c7478c912a9aeb",
+    "src/peer/header/peer_node.hpp": "ef17cfd077572361dfcd2e4718f19d22e9a30ef5b5d63a76b506fddf29ed2f7f",
+    "src/peer/header/state_manager.hpp": "87e449d076b76013449c2a809f5a9112bc92c286b1b7160cacaf1db8c7ae0e50",
+    "src/peer/header/tracker_client.hpp": "a4383567e8392f7f7072b837e028167540bac8e84060edc00b255abaf72935ef",
+    "src/peer/header/tui.hpp": "055ee31b318d593ba5cc1dd3dbe79e046802b54e086a2409b837b4b7b0aef9aa",
+    "src/peer/header/upload_server.hpp": "03f655a4fbb72a271e51f907565b7b9163e1f5e0e12f540f5f6f6b5fb93b7546",
+    "src/peer/header/web_ui.hpp": "821edb52b5710134fc09012ff2477788003efa36c3658ddd0dafe5bf13f2e17d",
+    "src/peer/src/database.cpp": "0edf809d5e524a630dda44c99f4c2d564cd9d5c06032270361749b7b9ed2a448",
+    "src/peer/src/download_manager.cpp": "268c79f2849d4ba5dc8383c757614dd014c200f221eadd40fe1f801c85289efc",
+    "src/peer/src/file_manager.cpp": "acef5ba4d77da083560bfe2842a26a5c18e02e58c6180a3cd5f95986a4b05130",
+    "src/peer/src/main.cpp": "d02ae98f487822e75135ac5eb35632dcac72e7f2f96dc8e37d79b807cd1c1d54",
+    "src/peer/src/peer_node.cpp": "3cb19f944b69cda1c4e3a8f216cb13af2b7cdbd58a9798d026e52cc43810d5a8",
+    "src/peer/src/state_manager.cpp": "7e281a22fd78e762be4fe68ac33b46c4d12d0067b3d1c7e004e5a19dbf11ac8f",
+    "src/peer/src/tracker_client.cpp": "0ca54b5b3ea54e09b4d50ca3c07f351985e18c9521dd0e4ffe6ce41da27babdd",
+    "src/peer/src/tui.cpp": "cc03c88ab47c0f5f961534b3157098b1ad168e0b3f40f072e83bdd1a68881b07",
+    "src/peer/src/upload_server.cpp": "6fbcae2f8bcb177fe9fe7e67644e7f53c046cbc920c47edf0f763b9175801967",
+    "src/peer/src/web_ui.cpp": "237aedeb0a7fc81b963d466c0bd9b9a47fa8027ec6e96e0f2db1575eca9328a4",
+    "src/tracker/CMakeLists.txt": "d747070bb1521615bf97d45742b7a81086e9c3045d71e3023a552caf4baefa40",
+    "src/tracker/header/peer_registry.hpp": "b4b86a5d231234d2ab598f9ade5abee0a555aa778ac47fc1f264dd5e98ed0e46",
+    "src/tracker/header/tracker_server.hpp": "d8c7234416bcbc0c99ab2a1132ec26ecb8b3d06f5c6fe5124f1b33d6790ebd07",
+    "src/tracker/src/main.cpp": "4a658a249ef329214d8073994b070f184a96f18ce5168f22d25f26c73cd0c93c",
+    "src/tracker/src/peer_registry.cpp": "511c8ef6fd70555ea975a03ea3aeac74c4405b400be0fb1699d724c5b4d5efe0",
+    "src/tracker/src/tracker_server.cpp": "4e50c94ab420f54666b4d58d9c4887cdea7eeaf83d07ca0e150d211bff3a8b02",
+    "tests/CMakeLists.txt": "e86ed4ecac36c6964092e5a2c53d265b5c6b3797d9edd77ea53ab9627b63d25b",
+    "tests/test_concurrent_download.cpp": "802a33be9c77328907628014606bc47fc2e5f6b11e0a2f155af1b7dbdbac9b24",
+    "tests/test_database.cpp": "5770c0b0fca8d9e8d374cd76fc1de89b472835f2bb92cb3fd29a710e69fe15db",
+    "tests/test_env.cpp": "e2ac603435e78a069d6c2e161179f1f3d6b9b7a61c33f0d2c8cb72d76e5d0eba",
+    "tests/test_fault_recovery.cpp": "0cfabf24f65b5d2adaa5cb7c14287a7cb3b7bcf128b00cac9df1221c319429ca",
+    "tests/test_file_manager.cpp": "1b33edbf233c411c2e5f41124bc0015ea60934138cc01fd5e2c0178508467170",
+    "tests/test_helpers.hpp": "5721fa5d9c49570c728b6b7eacf2529e970b9fd2ecb8010a873e19d20271c888",
+    "tests/test_invalid_data.cpp": "0187e1ecce90bdf346ebc1e8fa07831098ad3de1c9faf0b1b95ad6ffbf02371a",
+    "tests/test_metadata.cpp": "cb6e7499e2c117e93e68aeaf2a05747125778bfc71bb800c6d850d2e6bbf9b33",
+    "tests/test_peer_registry.cpp": "7fecc76e5d816cea592440357e211a695df9d0d51ef26532875fe40af9a5b50f",
+    "tests/test_protocol.cpp": "053a2a5806433ec511099a3bccb216e92180d6dc4bb007457ea44612ee3a1671",
+    "tests/test_sha256.cpp": "93d56ccb3f137ffda0f613d4b7014e4ceec72bbb020c820964e9252f101255b2",
+    "tests/test_state_manager.cpp": "1f11fa2f921c05409994e020025fbafea0ffc0a0203449def28cb7bb4f08fd72",
+    "tests/test_tracker_server.cpp": "f052c962b96a8b1802eea0af1369b1dd963712e4d7bd7f96e4a82f2169e51ced"
+  },
+  "artifact_sha256": {
+    "ctest-release.log": "578c7a6bcc85e0e957106ee49dd298441e2d56a6aa503a4991dc7f68b2fdb5b3",
+    "ctest-debug.log": "9adbcd973bb56212cb9ac4f2b494ddff7ecb8f99393cf2acfedbad4ace1d0cfb",
+    "demo-full.log": "223d10daed33e26621a365f49c3c4fddbb5f38002987163893cd39b0597dac25",
+    "bench.log": "683424f1aa65317427e60f0eaf6f147b8e0daa97f08bbda1b3982ebb1dd4360b",
+    "web-smoke.json": "838fbf98d7999ca2e657dd810034147e87160c2aba64f691647a119e50b14f60",
+    "web-smoke-peer.log": "df28167a55e0bc792626d6234cb43a782ca52efea9def783893b62e723ff3061",
+    "web-smoke-tracker.log": "9df1ec90a9c82b78c669a918e3cb4248e2a6e7a22199b302ce52fe63f5e373db",
+    "web-smoke-download.log": "63dd76baffcbc01edfc9324e217d44d7ddb0a7f830ecf424827f87f1e1b7eeac",
+    "test-summary.json": "df369225bc7c0ceeef5e228553eb18f83ece35385bcab9b3e7260d51719dafa1",
+    "../bench/results.csv": "984d3f2f4251c2bfa8a821534c44194ff9e282343fe63caa0c6ffd87b5dce086"
+  }
+}

@@ -1,0 +1,7 @@
+[ 20%] Built target CommonLib
+[ 28%] Built target TrackerLib
+[ 57%] Built target PeerLib
+[ 62%] Built target PeerApp
+[ 65%] Building CXX object tests/CMakeFiles/TestAll.dir/test_env.cpp.o
+[ 68%] Linking CXX executable TestAll
+[100%] Built target TestAll

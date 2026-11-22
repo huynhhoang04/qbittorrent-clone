@@ -1,6 +1,11 @@
 #include "logger.hpp"
 
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <chrono>
 
 using namespace std;
 
@@ -27,6 +32,26 @@ void Logger::clear_sink() {
     sink = nullptr;
 }
 
+string log_timestamp() {
+    using namespace std::chrono;
+    const auto now = system_clock::now();
+    const auto seconds_part = time_point_cast<seconds>(now);
+    const auto millis = duration_cast<milliseconds>(now - seconds_part).count();
+
+    const time_t raw = system_clock::to_time_t(now);
+    tm local {};
+#ifdef _WIN32
+    localtime_s(&local, &raw);
+#else
+    localtime_r(&raw, &local);
+#endif
+
+    ostringstream out;
+    out << put_time(&local, "%Y-%m-%d %H:%M:%S") << '.' << setfill('0') << setw(3)
+        << millis;
+    return out.str();
+}
+
 void Logger::emit(log_level level, const string& msg) {
     log_sink current_sink;
     {
@@ -41,8 +66,8 @@ void Logger::emit(log_level level, const string& msg) {
 
     static const char* colours[] = {"\033[34m", "\033[32m", "\033[33m", "\033[31m"};
     lock_guard<mutex> lock(mtx);
-    cout << colours[static_cast<int>(level)] << "[" << log_level_name(level) << "] "
-         << msg << "\033[0m" << endl;
+    cout << colours[static_cast<int>(level)] << "[" << log_timestamp() << "] ["
+         << log_level_name(level) << "] " << msg << "\033[0m" << endl;
 }
 
 void Logger::info(const string& msg) { emit(log_level::info, msg); }

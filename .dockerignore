@@ -1,1 +1,8 @@
 build/
+build-release/
+build_common/
+.git/
+.env
+data/
+scripts/report/.venv/
+__pycache__/

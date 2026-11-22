@@ -1,4 +1,5 @@
 build/
+build-release/
 build_common/
 .cache/
 *.db
@@ -11,3 +12,5 @@ data/
 !data/.gitkeep
 temp_ls.txt
 test_sqlite.cmake
+scripts/report/.venv/
+__pycache__/

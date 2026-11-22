@@ -1,0 +1,26 @@
+[34m[2026-11-22 09:31:09.723] [INFO] Loaded state for 0 torrent(s) from database[0m
+[34m[2026-11-22 09:31:09.723] [INFO] Starting PeerNode [peer-0-e5cfc4643f91aec4] on port 0[0m
+[34m[2026-11-22 09:31:09.723] [INFO] UploadServer listening on port 43293[0m
+[32m[2026-11-22 09:31:09.723] [SUCCESS] Tracker is healthy[0m
+[32m[2026-11-22 09:31:09.723] [SUCCESS] PeerNode is up and running on port 43293[0m
+[32m[2026-11-22 09:31:09.723] [SUCCESS] Return torrrent info now[0m
+[33m[2026-11-22 09:31:09.723] [WARN] Torrent metadata names the file '../../outside.bin', which is not a plain file name; saving as 'download.bin'[0m
+[34m[2026-11-22 09:31:09.723] [INFO] Initialized state for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323 (1 chunks)[0m
+[32m[2026-11-22 09:31:09.723] [SUCCESS] Announce to Tracker succeeded[0m
+[34m[2026-11-22 09:31:09.723] [INFO] Starting download of download.bin to /tmp/qbt-web-validation-bs9f02o3/sandbox/output/download.bin[0m
+[34m[2026-11-22 09:31:09.724] [INFO] Starting multi-peer download for download.bin (1 chunks)[0m
+[34m[2026-11-22 09:31:09.724] [INFO] Received 2 peers from Tracker[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Success[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Verified chunk 0 for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Start hashsing file :/tmp/qbt-web-validation-bs9f02o3/sandbox/output/download.bin[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Success[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Download complete and verified for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Contributed 1 chunk(s) by peer peer-0-00b5345fee2e447a[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Multi-source summary: 1 peer(s) delivered chunks[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Announce to Tracker succeeded[0m
+[32m[2026-11-22 09:31:09.725] [SUCCESS] Successfully downloaded file: download.bin[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Stopping PeerNode [peer-0-e5cfc4643f91aec4]...[0m
+[34m[2026-11-22 09:31:10.223] [INFO] Stopping UploadServer on port 43293...[0m
+[32m[2026-11-22 09:31:10.223] [SUCCESS] UploadServer stopped[0m
+[32m[2026-11-22 09:31:10.223] [SUCCESS] PeerNode stopped cleanly[0m
+[32m[2026-11-22 09:31:10.223] [SUCCESS] PeerApp exited cleanly[0m

@@ -2,6 +2,7 @@
 #include <csignal>
 #include <cstdlib>
 
+#include "env.hpp"
 #include "logger.hpp"
 #include "peer_node.hpp"
 #include "tui.hpp"
@@ -80,18 +81,29 @@ namespace
 int main(int argc, char *argv[])
 {
     Logger log;
-    const char *tracker_url_env = std::getenv("TRACKER_URL");
-    string tracker_url = tracker_url_env && *tracker_url_env
-                             ? tracker_url_env
-                             : "http://localhost:8080";
-    int port = 6881;
-    string data_dir = "./data/peer";
+    // `.env` is optional; anything already in the real environment wins.
+    appenv::load_file(".env");
+
+    string tracker_url = appenv::get_string("TRACKER_URL", "http://localhost:8080");
+    int port = appenv::get_int("PEER_PORT", 6881, 0, 65535);
+    string data_dir = appenv::get_string("PEER_DATA_DIR", "./data/peer");
     string seed_path;
     string download_path;
     string output_dir;
 
     peer_node_options options;
     peer_node_options parsed_options;
+    // These four were listed in .env.example but never read; they now seed the
+    // defaults so the documented file actually does something.
+    int max_downloads = appenv::get_int("MAX_ACTIVE_DOWNLOADS", 5, 1, 1024);
+    int max_uploads = appenv::get_int("MAX_ACTIVE_UPLOADS", 5, 1, 1024);
+    int pipeline_depth = appenv::get_int("PIPELINE_DEPTH", 3, 1, 1024);
+    int io_timeout_ms = appenv::get_int("IO_TIMEOUT_MS", 4000, 500, 600000);
+    parsed_options.max_active_downloads = max_downloads;
+    parsed_options.max_active_uploads = max_uploads;
+    parsed_options.pipeline_depth = pipeline_depth;
+    parsed_options.io_timeout_ms = io_timeout_ms;
+    parsed_options.webui_port = appenv::get_int("WEBUI_PORT", 8081, 1, 65535);
     size_t chunk_size = 256 * 1024;
     bool option_error = false;
 
@@ -227,9 +239,10 @@ int main(int argc, char *argv[])
         {
             Logger::set_sink([&web_ui](log_level level, const string &message) {
                 const char* lvl = log_level_name(level);
-                cout << "[" << lvl << "] " << message << "\n";
+                const string stamp = log_timestamp();
+                cout << "[" << stamp << "] [" << lvl << "] " << message << "\n";
                 if (web_ui) {
-                    web_ui->add_log(string("[") + lvl + "] " + message);
+                    web_ui->add_log("[" + stamp + "] [" + lvl + "] " + message);
                 }
             });
         }

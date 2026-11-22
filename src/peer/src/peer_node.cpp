@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 
+#include "env.hpp"
 #include "logger.hpp"
 #include "net.hpp"
 #include "sha256.hpp"
@@ -20,11 +21,27 @@ namespace
         {
             return configured_url;
         }
+        return appenv::get_string("TRACKER_URL", "http://localhost:8080");
+    }
 
-        const char *tracker_url_env = std::getenv("TRACKER_URL");
-        return tracker_url_env && *tracker_url_env
-                   ? tracker_url_env
-                   : "http://localhost:8080";
+    // `file_name` comes from a .torrent.json that arrived out of band, so a
+    // hostile or broken metadata file can carry "../../etc/foo". The name is
+    // joined to the download directory, so only a single plain component is
+    // accepted and anything else is replaced by a neutral one.
+    string safe_metadata_name(const string &raw)
+    {
+        if (raw.empty() || raw == "." || raw == "..")
+        {
+            return "download.bin";
+        }
+        for (char ch : raw)
+        {
+            if (ch == '/' || ch == '\\' || static_cast<unsigned char>(ch) < 0x20)
+            {
+                return "download.bin";
+            }
+        }
+        return raw;
     }
 
 } // namespace
@@ -197,8 +214,8 @@ bool PeerNode::announce_file(const string &file_id, bool force)
     if (!options.announce_ip.empty()) {
         chosen_ip = options.announce_ip;
     } else {
-        const char *peer_host_env = std::getenv("PEER_HOST");
-        if (peer_host_env && *peer_host_env) {
+        const string peer_host_env = appenv::get_string("PEER_HOST", "");
+        if (!peer_host_env.empty()) {
             chosen_ip = peer_host_env;
         } else {
             string detected = net_detect_outbound_ip(tracker_client ? tracker_client->get_host() : "",
@@ -353,6 +370,16 @@ bool PeerNode::download_file(const string &torrent_path, const string &output_di
     const string file_id = meta.file_hash;
     const string dest_dir = output_dir.empty() ? data_dir : output_dir;
     filesystem::create_directories(dest_dir);
+    // Everything downstream (record, remember_torrent, the web dashboard's
+    // metadata lookup) derives paths from this name, so it is sanitised once
+    // here instead of at each use.
+    if (safe_metadata_name(meta.file_name) != meta.file_name)
+    {
+        log.warnning("Torrent metadata names the file '" + meta.file_name +
+                     "', which is not a plain file name; saving as '" +
+                     safe_metadata_name(meta.file_name) + "'");
+        meta.file_name = safe_metadata_name(meta.file_name);
+    }
     const string out_file_path = dest_dir + "/" + meta.file_name;
 
     torrent_record record;
