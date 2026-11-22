@@ -1,0 +1,19 @@
+bench: build=/mnt/Data/ptit/qbittorrent-clone/build-release chunk_size=256KB chunk_delay=50ms
+
+
+| Dimension | Configuration | Data (MB) | Time (s) | Throughput (MB/s) | Contributors | Peak RSS (MB) | SHA-256 verified |
+|---|---|---:|---:|---:|---:|---:|---|
+| sources | 1-source | 100.0 | 20.52 | 4.9 | 1 | 12.0 | yes |
+| sources | 2-source | 100.0 | 10.51 | 9.5 | 2 | 13.1 | yes |
+| sources | 3-source | 100.0 | 7.06 | 14.2 | 3 | 14.4 | yes |
+| filesize | 10MB | 10.0 | 2.52 | 4.0 | 1 | 12.0 | yes |
+| filesize | 50MB | 50.0 | 10.52 | 4.8 | 1 | 12.1 | yes |
+| filesize | 100MB | 100.0 | 20.54 | 4.9 | 1 | 12.1 | yes |
+| concurrency | 1-leecher/1-slot | 20.0 | 4.52 | 4.4 | - | - | yes |
+| concurrency | 4-leecher/1-slot | 80.0 | 5.05 | 15.8 | - | - | yes |
+| concurrency | 8-leecher/1-slot | 160.0 | 5.01 | 32.0 | - | - | yes |
+| concurrency | 1-leecher/8-slot | 20.0 | 4.51 | 4.4 | - | - | yes |
+| concurrency | 4-leecher/8-slot | 80.0 | 2.51 | 31.9 | - | - | yes |
+| concurrency | 8-leecher/8-slot | 160.0 | 2.04 | 78.5 | - | - | yes |
+
+csv written to /mnt/Data/ptit/qbittorrent-clone/docs/bench/results.csv

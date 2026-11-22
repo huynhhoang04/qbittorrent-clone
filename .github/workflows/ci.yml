@@ -66,6 +66,10 @@ jobs:
         run: |
           bash scripts/demo_full.sh
 
+      - name: Check environment and Web dashboard paths
+        run: |
+          QBT_BUILD_DIR="$PWD/build" python3 scripts/web_smoke.py
+
       - name: Upload Linux Binaries
         uses: actions/upload-artifact@v4
         with:

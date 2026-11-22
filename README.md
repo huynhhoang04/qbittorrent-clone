@@ -124,7 +124,7 @@ Peer tự dò IP card mạng ra ngoài. Có thể chỉ định thủ công:
 # 48 bài unit + integration test (có tracker/peer thật trên loopback)
 ctest --test-dir build --output-on-failure
 
-# 7 kịch bản demo bắt buộc của đề bài — in 1 dòng PASS/FAIL cho mỗi kịch bản
+# 7 kịch bản demo tự động — in 1 dòng PASS/FAIL cho mỗi kịch bản
 ./scripts/demo_full.sh
 
 # Thí nghiệm hiệu năng (cần bản Release), xuất bảng markdown + CSV
@@ -133,19 +133,19 @@ cmake --build build-release -j"$(nproc)"
 BENCH_CSV=docs/bench/results.csv ./scripts/bench.sh
 ```
 
-Kết quả lần chạy trên máy phát triển (8 luồng, tệp 100 MB, độ trễ 50 ms/mảnh):
+Kết quả lần chạy trên máy phát triển (8 luồng, tệp 100 MiB, độ trễ 50 ms/mảnh):
 
 | Nguồn | Thời gian | Thông lượng | Tăng tốc |
 | ---: | ---: | ---: | ---: |
-| 1 | 20,53 s | 4,9 MB/s | 1,00× |
-| 2 | 10,54 s | 9,5 MB/s | 1,95× |
-| 3 | 7,05 s | 14,2 MB/s | 2,91× |
+| 1 | 20,52 s | 4,87 MiB/s | 1,00× |
+| 2 | 10,51 s | 9,52 MiB/s | 1,95× |
+| 3 | 7,06 s | 14,17 MiB/s | 2,91× |
 
 Số liệu thô và phân tích đầy đủ ở mục 15 của báo cáo.
 
 ---
 
-## 5. Bảy kịch bản demo bắt buộc
+## 5. Bảy kịch bản demo tự động
 
 `scripts/demo_full.sh` dựng tracker và các peer thật, mỗi kịch bản dùng cổng và thư mục
 riêng, và chỉ kill những PID nó tự tạo.
@@ -161,6 +161,14 @@ riêng, và chỉ kill những PID nó tự tạo.
 | 7 | Tracker loại peer quá hạn | Peer chết biến mất khỏi `/peers` trong khoảng 45–75 s |
 
 `scripts/inject_fault.sh <pid> crash|stop` là công cụ dùng trong kịch bản 4, 6, 7.
+
+Danh sách trên có thêm resume và lease nên không khớp một-một với bảy tình huống
+DS02 §6.4. Yêu cầu upload khi chưa hoàn tất được kiểm tra trong bộ concurrency;
+khi bảo vệ cần trình diễn riêng theo [kịch bản hai máy](docs/demo-2-may.md).
+
+Log kiểm thử và thông tin phiên bản được lưu tại [docs/evidence](docs/evidence/README.md).
+Nguồn nội dung/bố cục PDF nằm trong `scripts/report/`; xem
+[hướng dẫn dựng báo cáo](scripts/report/README.md) để giữ đúng Times New Roman.
 
 ---
 
@@ -193,7 +201,7 @@ cp .env.example .env
 ```
 
 Quy tắc ưu tiên: **tham số dòng lệnh > biến môi trường thật > `.env` > giá trị mặc định**.
-Một biến đã có trong môi trường tiến trình sẽ **không** bị `.env` ghi đè, nên cấu hình
+Một biến đã có giá trị **không rỗng** trong môi trường tiến trình sẽ **không** bị `.env` ghi đè, nên cấu hình
 của container/CI luôn thắng tệp trong kho.
 
 | Biến | Mặc định | Ý nghĩa |
@@ -238,9 +246,9 @@ Không commit `.env` — chỉ `.env.example` được đưa vào kho.
 
 | Thành viên | GitHub | Phụ trách chính | Minh chứng |
 | --- | --- | --- | --- |
-| Em Huynh | [@huynhhoang04](https://github.com/huynhhoang04) | Tracker service (registry, HTTP API, tracker client); M4 peer networking (upload server, download manager, state manager, CLI); Web UI; CI + demo hardening | Issues #1–#8, #21; PR #25, #26 |
-| giaback | [@giaback](https://github.com/giaback) | M5 tải song song đa nguồn, connection limiting / choking, full-duplex, concurrency tests; M6 chịu lỗi, tự động hóa demo, TUI ncurses | Issues #9–#14; PR #19, #20 |
-| Nguyễn Hữu Trường | [@TruongNguyen2703](https://github.com/TruongNguyen2703) | Docker/Compose, sửa crash tracker, ASan + profiling + dọn mã nguồn, README / .env.example / final test / release tag | Issues #15, #16, #18; PR #22, #23, #24 |
+| Hoàng Văn Huynh — B23DCDT131 | [@huynhhoang04](https://github.com/huynhhoang04) | Tracker service (registry, HTTP API, tracker client); M4 peer networking (upload server, download manager, state manager, CLI); Web UI; CI + demo hardening | Issues #1–#8, #21; PR #25, #26 |
+| Nguyễn Gia Bách — B23DCVT042 | [@giaback](https://github.com/giaback) | M5 tải song song đa nguồn, connection limiting / choking, full-duplex, concurrency tests; M6 chịu lỗi, tự động hóa demo, TUI ncurses | Issues #9–#14; PR #19, #21 |
+| Nguyễn Hữu Trường — B23DCVT424 | [@TruongNguyen2703](https://github.com/TruongNguyen2703) | Docker/Compose, sửa crash tracker, ASan + profiling + dọn mã nguồn, README / .env.example / final test / release tag | Issues #15, #16, #18; PR #22, #23, #24 |
 
 Chi tiết phân công theo cột mốc và bảng đóng góp ở mục 2 của báo cáo.
 

@@ -1,0 +1,11 @@
+[  2%] Building CXX object src/common/CMakeFiles/CommonLib.dir/src/env.cpp.o
+[  5%] Linking CXX static library libCommonLib.a
+[ 18%] Built target CommonLib
+[ 27%] Built target TrackerLib
+[ 54%] Built target PeerLib
+[ 56%] Linking CXX executable TrackerApp
+[ 59%] Linking CXX executable PeerApp
+[ 62%] Built target TrackerApp
+[ 64%] Built target PeerApp
+[ 67%] Linking CXX executable TestAll
+[100%] Built target TestAll

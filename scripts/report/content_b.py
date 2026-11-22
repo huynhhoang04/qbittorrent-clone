@@ -4,6 +4,8 @@ All numbers come from docs/bench/results.csv (scripts/bench.sh) and from the
 recorded output of scripts/demo_full.sh and ctest on this machine.
 """
 
+from report_data import ROOT, EVIDENCE, validation
+
 from reportlab.lib.units import mm
 from reportlab.platypus import PageBreak, Spacer
 
@@ -23,574 +25,257 @@ from report_lib import (
 
 
 def section_11_fault():
-    return [
-        h1("11. Chịu lỗi và phục hồi"),
-        h2("11.1. Mô hình lỗi và ngân sách lỗi"),
-        rich(
-            "Hệ thống xử lý bốn tình huống lỗi mà đề bài yêu cầu, cộng thêm hai tình huống vận hành thực tế. Mỗi "
-            "tình huống đều có một ngưỡng phát hiện và một ngân sách thử lại hữu hạn, để một sự cố cục bộ không "
-            "biến thành vòng lặp vô hạn."
-        ),
-        table(
-            ["Tình huống", "Cách phát hiện", "Phản ứng", "Ngưỡng"],
-            [
-                ("Peer rời mạng giữa chừng", "`recv` trả 0/lỗi, hoặc hết `io_timeout_ms`",
-                 "Đưa mảnh đang bay trở lại hàng đợi; chọn peer khác; blacklist peer đó cho mảnh đó",
-                 "timeout 4000 ms, tối đa 12 lần/mảnh, 3 lỗi/peer"),
-                ("Dữ liệu hỏng", "SHA-256 mảnh không khớp metadata",
-                 "Không ghi mảnh; blacklist peer cho mảnh đó; yêu cầu lại từ peer khác",
-                 "ngay lập tức, cùng ngân sách retry"),
-                ("Tiến trình bị kill", "Không cần phát hiện — khởi động lại và nạp lại",
-                 "Đọc SQLite, xác minh lại từng mảnh đã ghi, tải tiếp phần còn thiếu",
-                 "resume, không tải lại từ đầu"),
-                ("Tracker sập", "HTTP lỗi / timeout",
-                 "Các luồng đang chạy tiếp tục; peer vẫn thử hỏi lại theo chu kỳ",
-                 "heartbeat 15 s"),
-                ("Seeder hết slot", "Nhận `CHOKE`",
-                 "Chuyển sang peer khác trong danh sách đã biết",
-                 "`choke_wait_ms` = 2000 ms"),
-                ("Mảnh không còn nguồn nào giữ", "Không còn peer khả dụng cho mảnh đó",
-                 "Peer vẫn sống, hỏi lại tracker theo chu kỳ; không kết thúc sớm giả tạo",
-                 "khám phá lại mỗi 250 ms"),
-            ],
-            widths=[0.22, 0.24, 0.36, 0.18],
-        ),
-        caption("Bảng 11.1 — Sáu tình huống lỗi, ngưỡng phát hiện và phản ứng."),
-        spacer(2),
-        h2("11.2. Ba cơ chế chính"),
-        rich(
-            "**Timeout và retry có giới hạn.** Mỗi thao tác socket có hạn thời gian; mỗi mảnh có ngân sách 12 lần thử; "
-            "mỗi peer có ngân sách 3 lỗi trước khi bị loại khỏi phiên. Khi một mảnh cạn ngân sách, nó được đưa vào "
-            "`failed_chunks` và cả phiên tải kết thúc với lỗi rõ ràng thay vì treo vô hạn."
-        ),
-        rich(
-            "**Blacklist theo từng mảnh, không theo peer.** Khi phát hiện mảnh hỏng, hệ thống không loại toàn bộ peer "
-            "mà chỉ ghi “peer P không được phục vụ mảnh i”. Đây là quyết định quan trọng: một peer có thể hỏng đúng "
-            "một mảnh trên đĩa (lỗi đọc sector) nhưng vẫn phục vụ tốt 399 mảnh còn lại. Blacklist toàn cục sẽ làm "
-            "mất một nguồn lành mạnh, còn blacklist theo mảnh giữ được phần lớn giá trị của nó."
-        ),
-        rich(
-            "**Checkpoint và resume.** Trạng thái mỗi mảnh được ghi vào SQLite **ngay sau** khi xác minh thành công, "
-            "không chờ hết tệp. Khi tiến trình khởi động lại, `StateManager::load_from_db` nạp bitfield từ bảng "
-            "`chunks`, rồi `verify_existing_chunks` đọc lại từng mảnh đã đánh dấu để chắc chắn nội dung trên đĩa vẫn "
-            "khớp metadata trước khi tin tưởng nó. Chi phí này chỉ trả một lần lúc khởi động và bảo vệ khỏi trường "
-            "hợp tệp bị sửa hoặc đĩa lỗi."
-        ),
-        code(
-            """// Khởi động lại: nạp từ SQLite, rồi xác minh lại nội dung trên đĩa
-auto torrents = db->get_all_torrents();
-for (const auto& t : torrents) {
-    vector<bool> bf(t.num_chunks, false);
-    for (const auto& c : db->get_chunks(t.file_id))
-        if (c.status == "verified") bf[c.chunk_index] = true;
-    bitfields[t.file_id] = bf;          // trạng thái khôi phục
-}
-// download_manager.cpp — chỉ tải những mảnh còn thiếu
-pending_chunks = state_manager->get_missing_chunks(file_id);"""
-        ),
-        h2("11.3. Kết quả kiểm chứng"),
-        rich(
-            "Bốn bài kiểm thử trong `tests/test_fault_recovery.cpp` bao phủ các tình huống trên. Bài "
-            "`SeederDeathMidDownloadFailsOverToSecondSeeder` giết seeder giữa chừng và yêu cầu tệp vẫn hoàn tất với "
-            "mã băm đúng; bài `CorruptedOnlySourceIsRejectedAndDownloadFails` kiểm tra trường hợp **chỉ** có nguồn "
-            "hỏng — hệ thống phải thất bại rõ ràng chứ không được ghi một tệp sai. Bài "
-            "`RealProcessCrashResumesFromPersistedSqliteState` khởi động một `PeerApp` thật, kill bằng `SIGKILL` "
-            "giữa lúc tải, rồi khởi động lại với cùng thư mục trạng thái; bài này chỉ được biên dịch trên Windows "
-            "nên bị bỏ qua trên Linux (xem mục 14.3). Kịch bản demo 4 và 6 kiểm chứng cùng hai tình huống này trên "
-            "bản Release, độc lập với bộ unit test."
-        ),
+    return [h1("11. Chịu lỗi và phục hồi"),
+        h2("11.1. Mô hình lỗi và phản ứng"),
+        rich("Mô hình xử lý gồm crash-stop, khởi động lại tiến trình, kết nối bị ngắt hoặc quá hạn và nội dung mảnh không khớp metadata. Không coi hash là cơ chế chống mọi hành vi Byzantine: tính an toàn còn phụ thuộc metadata tin cậy. Khả năng hoàn tất còn phụ thuộc ít nhất một nguồn khả dụng cho mọi mảnh còn thiếu."),
+        table(["Sự cố", "Phát hiện", "Phản ứng / giới hạn"], [
+            ("Nguồn bị kill hoặc mất mạng", "EOF/lỗi socket; timeout kết nối hoặc I/O", "Thu hồi in-flight, đưa mảnh về pending và thử nguồn khác; không cần chờ lease tracker"),
+            ("Mảnh bị sửa", "SHA-256 không khớp chunk_hashs[i]", "Không ghi mảnh; blacklist cặp (mảnh, peer); tải lại từ nguồn khác"),
+            ("Nguồn đều hỏng hoặc không giữ phần còn lại", "Không tiến triển, không còn phiên hữu ích", "Khám phá hữu hạn; báo lỗi, không công bố tệp hoàn tất"),
+            ("Leecher bị kill", "Phát hiện khi chạy lại", "Cùng DB, metadata và tệp đích; băm lại mảnh đã lưu; chỉ tải phần thiếu hoặc sai"),
+            ("Tracker dừng", "HTTP thất bại", "Các kết nối dữ liệu đã có có thể tiếp tục; khám phá peer mới bị ảnh hưởng"),
+            ("Nguồn hết slot", "CHOKE hoặc hết chờ cấp slot", "Thử peer khác; chờ slot hữu hạn, không bảo đảm lịch phục vụ công bằng"),
+        ], widths=[.24,.27,.49]),
+        caption("Bảng 11.1 — Các lỗi chọn xử lý và điều kiện phục hồi."),
+        h2("11.2. Timeout và ngân sách thử lại"),
+        rich("Giá trị mặc định trong download_options: connect_timeout_ms = 3000; io_timeout_ms = 4000; max_attempts_per_chunk = 12; max_peer_failures = 3; discovery_attempts = 3; discovery_wait_ms = 500. Một vài giá trị được cấu hình qua CLI. Đây là ngân sách nội bộ, không có nghĩa mọi trường hợp thất bại đều mất đúng 12 × 4 giây."),
+        rich("Scheduler kiểm tra nguồn mới theo chu kỳ tối thiểu max(250 ms, discovery_wait_ms), tức mặc định khoảng 500 ms khi vòng lặp có thể chạy. Khám phá trả về peer cũ chưa chứng minh tiến triển. Khi không còn session hữu ích, ngân sách discovery vẫn phải đi tới giới hạn để tránh treo vô hạn. Nếu cạn retry của mảnh, phiên tải kết thúc lỗi rõ ràng."),
+        h2("11.3. Checkpoint và phục hồi"),
+        numbered(["Nhận PIECE, kiểm tra index, độ dài và SHA-256 theo metadata trước khi ghi.",
+                  "Ghi nội dung tại offset i × chunk_size; cập nhật bitfield và trạng thái verified trong DB cục bộ.",
+                  "Khi restart, StateManager nạp các mảnh verified; DownloadManager đọc lại nội dung để xác minh.",
+                  "Mảnh thiếu hoặc sai bị đánh lại missing; chỉ những mảnh chưa hợp lệ được đưa vào hàng chờ.",
+                  "Khi đủ mảnh, băm lại toàn tệp; chỉ báo thành công nếu hash tổng khớp."]),
+        rich("SQLite và tệp dữ liệu không cùng một transaction nguyên tử. Vì vậy cần kiểm tra lại nội dung khi resume; WAL không tự làm cho tệp dữ liệu và DB đồng bộ nguyên tử. Thử nghiệm kill tiến trình cũng không tương đương kiểm thử mất điện hoặc hỏng thiết bị lưu trữ."),
+        h2("11.4. Minh chứng và giới hạn kiểm chứng"),
+        rich("Log đã lưu cho thấy SeederDeathMidDownloadFailsOverToSecondSeeder và CorruptedOnlySourceIsRejectedAndDownloadFails đều PASS. Test RealProcessCrashResumesFromPersistedSqliteState SKIP trên Linux vì nhánh kiểm thử tiến trình này chỉ hỗ trợ Windows. Do đó không thể dùng kết quả ctest Linux để kết luận test crash-resume đã chạy; cần demo kill/restart hoặc log chạy độc lập trên môi trường hỗ trợ (mục 14)."),
     ]
+
 
 
 def section_12_security():
-    return [
-        h1("12. Bảo mật"),
-        h2("12.1. Kiểm soát đã hiện thực"),
-        table(
-            ["Nhóm kiểm soát", "Cơ chế", "Vị trí"],
-            [
-                ("Xác thực phiên", "`HANDSHAKE` bắt buộc là khung đầu tiên; `peer_id` + `file_id` phải khớp trước khi phục vụ",
-                 "`upload_server.cpp`"),
-                ("Toàn vẹn dữ liệu", "SHA-256 từng mảnh + toàn tệp; sai lệch bị loại, không bao giờ ghi",
-                 "`download_manager.cpp`"),
-                ("Giới hạn kích thước", "Khung tối đa 8 MB; `peer_id`/`file_id` tối đa 128 byte; kiểm tra trước khi cấp phát",
-                 "`protocol.cpp`"),
-                ("Kiểm tra dữ liệu vào", "Âm thanh JSON phải đúng kiểu; cổng 1–65535; `bitfield` là mảng boolean",
-                 "`tracker_server.cpp`"),
-                ("Chỉ số trong phạm vi", "`REQUEST` ngoài `num_chunks` bị đóng kết nối và giải phóng slot",
-                 "`upload_server.cpp`"),
-                ("Chống SQL injection", "Toàn bộ truy vấn dùng `sqlite3_prepare_v2` + bind tham số",
-                 "`database.cpp`"),
-                ("Giới hạn tài nguyên", "`max_active_downloads/uploads`, hàng đợi 64 kết nối, slot có timeout",
-                 "`upload_server.cpp`"),
-                ("Không lưu bí mật", "`.env` bị `.gitignore`; chỉ `.env.example` được commit; kho không chứa secret",
-                 "`.gitignore`, `.env.example`"),
-            ],
-            widths=[0.20, 0.58, 0.22],
-        ),
-        caption("Bảng 12.1 — Các kiểm soát bảo mật cơ bản đã hiện thực."),
-        spacer(2),
-        h2("12.2. Phân tích tấn công đã chống được"),
-        rich(
-            "**Khung tin phình to (length-prefix attack).** Kẻ tấn công gửi 4 byte độ dài là 4 GB rồi không gửi gì. "
-            "Nếu bên nhận tin vào tiền tố độ dài và cấp phát ngay, một kết nối có thể làm cạn kiệt bộ nhớ. Trong "
-            "thiết kế này, `recv_wire_message` kiểm tra `length > MAX_WIRE_MESSAGE_SIZE` và đóng kết nối **trước khi** "
-            "cấp phát; bài `DeserializeRejectsOversizedLengthBeforeAllocating` khẳng định đúng hành vi đó."
-        ),
-        rich(
-            "**Chỉ số ngoài phạm vi.** Một `REQUEST` với `index = 0xFFFFFFFF` có thể gây đọc ngoài mảng hoặc tràn số "
-            "khi tính offset. Hệ thống so sánh với `num_chunks` trước khi đọc đĩa và đóng kết nối; bài "
-            "`OutOfRangeChunkRequestClosesConnectionWithoutSlotLeak` còn kiểm tra rằng slot tải lên **không bị rò** "
-            "sau khi đóng."
-        ),
-        rich(
-            "**Mạo danh peer.** Tracker dùng chính `peer_id` do peer công bố nên một peer ác ý có thể announce cùng "
-            "`peer_id` với peer khác và ghi đè IP/port của nó. Đây là điểm yếu đã biết: trong phạm vi đồ án, mô hình "
-            "tin cậy là mạng lớp học và các peer đều do cùng nhóm triển khai, nên chưa có chữ ký số cho announce. "
-            "Mục 16 ghi nhận hướng khắc phục (chữ ký trên announce bằng khóa công khai của peer)."
-        ),
-        h2("12.3. Điểm chưa đáp ứng"),
-        rich(
-            "Đề bài *khuyến khích* TLS/mã hóa thông điệp và yêu cầu xác thực người dùng. Đồ án chưa hiện thực TLS cho "
-            "kênh HTTP của tracker, chưa có mã hóa kênh TCP giữa các peer, và dashboard Web không có xác thực. Đây là "
-            "các khoảng trống được nêu thẳng thắn ở mục 16 thay vì được mô tả như đã có."
-        ),
-        rich(
-            "**Một lỗ hổng đã sửa trong quá trình hoàn thiện.** Endpoint upload của Web dashboard nhận tham số "
-            "`filename` từ query string và nối trực tiếp vào đường dẫn ghi tệp, cho phép ghi ra ngoài thư mục dữ liệu "
-            "(`../`). Đây là lỗi path traversal cổ điển; bản nộp bài đã thêm bước kiểm tra chỉ cho phép tên tệp không "
-            "chứa dấu phân cách đường dẫn trước khi ghi."
-        ),
+    return [h1("12. Bảo mật"),
+        h2("12.1. Mô hình tin cậy"),
+        rich("Nguyên mẫu giả định các tiến trình do nhóm triển khai trong LAN kiểm soát và metadata được nhận qua kênh tin cậy. Đây là giới hạn triển khai, không miễn trừ các yêu cầu bắt buộc ở §4.5 [1]. SHA-256 kiểm tra nội dung theo metadata; HANDSHAKE khai báo Peer ID và File ID để kiểm tra phiên, chưa chứng minh người gửi sở hữu danh tính đó."),
+        table(["Kiểm soát", "Hiện trạng", "Phạm vi bảo vệ"], [
+            ("Framing và cấp phát", "Length tối đa 8 MiB; handshake field tối đa 128 byte", "Từ chối frame quá lớn trước cấp phát; không suy rộng giới hạn này cho HTTP upload"),
+            ("Dữ liệu tracker", "JSON đúng kiểu; port 1–65535; bitfield boolean", "Loại nhiều đầu vào sai; chưa chứng minh có quota/body limit cho mọi endpoint"),
+            ("REQUEST và PIECE", "Kiểm tra chỉ số, kích thước, in-flight và hash", "Hạn chế truy cập ngoài phạm vi và từ chối mảnh không hợp lệ"),
+            ("Truy cập SQLite", "Prepared statement và bind; mutex ở lớp ứng dụng", "Tách tham số khỏi câu SQL; không thay thế phân quyền tài nguyên"),
+            ("Giới hạn tài nguyên", "Giới hạn phiên/slot; hàng đợi upload hữu hạn; timeout", "Giảm nguy cơ cạn tài nguyên; chưa phải chống DoS đầy đủ"),
+            ("Cấu hình", "Không có tài khoản/mật khẩu trong luồng hiện tại; dùng biến môi trường cho cấu hình hỗ trợ", "Khi bổ sung secret cần nạp ngoài Git; .gitignore không chứng minh lịch sử Git sạch secret"),
+        ], widths=[.22,.36,.42]),
+        caption("Bảng 12.1 — Kiểm soát đã quan sát trong nguồn và giới hạn tương ứng."),
+        h2("12.2. Khoảng thiếu so với §4.5"),
+        rich("**Xác thực và phân quyền còn thiếu.** Tracker tin Peer ID tự khai; peer khác có thể announce cùng ID và ghi đè endpoint. Dashboard chưa có đăng nhập/token và chưa có ACL cho thao tác seed/download. Không gọi kiểm tra HANDSHAKE là xác thực mật mã hoặc xác thực người dùng."),
+        rich('**Đường dẫn và kích thước HTTP.** Mã nguồn có safe_file_name/resolve_within ở các endpoint Web và safe_metadata_name tại PeerNode để chặn tên không an toàn và hạn chế đường dẫn. 15 kiểm tra HTTP/tích hợp bổ sung đã đạt, bao gồm upload hợp lệ, tên tệp thoát thư mục bị từ chối, đường dẫn API nằm ngoài data-dir bị loại, metadata chứa tên không an toàn được đổi về tên cục bộ và tệp tải vẫn đúng hash. Đây chưa phải kiểm chứng mọi trường hợp symlink, quota hoặc HTTP body limit; log chi tiết nằm ở docs/evidence/web-smoke.json.'),
+        rich("**Địa chỉ mạng và kênh truyền.** Header X-Forwarded-For/X-Real-IP cần chỉ được tin khi đi qua proxy cho phép; địa chỉ tự khai không phải bằng chứng sở hữu. HTTP tracker và TCP dữ liệu chưa được bảo vệ bằng TLS trong cấu hình hiện tại. TLS được đề bài khuyến khích; xác thực và kiểm soát truy cập là yêu cầu bắt buộc, cần ghi riêng mức đáp ứng."),
+        h2("12.3. Ưu tiên hoàn thiện và tiêu chí kiểm tra"),
+        rich("Ưu tiên bổ sung token hoặc khóa peer, ACL cho tài nguyên và dashboard; xác minh danh tính announce; chặn path traversal và upload quá lớn; sau đó thêm TLS và hạn mức theo peer/IP. Kiểm thử phải có trường hợp không có/sai token bị từ chối, peer không được phép đọc tệp, filename thoát thư mục bị loại và payload quá giới hạn không gây treo."),
+        rich("Mười InvalidDataTest trong mục 14 chứng minh các biện pháp kiểm tra dữ liệu sai ở wire protocol. Chúng không chứng minh hệ thống đã có xác thực, phân quyền hoặc chặn mọi đầu vào HTTP. Nội dung này cần được nói rõ khi bảo vệ."),
     ]
+
 
 
 def section_13_implementation():
-    return [
-        h1("13. Hiện thực"),
-        h2("13.1. Tổ chức mã nguồn"),
-        table(
-            ["Thư mục", "Số dòng", "Nội dung"],
-            [
-                ("`src/common/`", "946", "protocol, sha256, metadata, logger, net — thư viện tĩnh dùng chung"),
-                ("`src/tracker/`", "475", "peer_registry, tracker_server, main"),
-                ("`src/peer/`", "5 209", "peer_node, download_manager, upload_server, state_manager, database, file_manager, tracker_client, tui, web_ui"),
-                ("`tests/`", "2 233", "11 tệp, 42 bài kiểm thử"),
-                ("`scripts/`", "—", "demo_full, bench, inject_fault, start_peer, start_tracker, generate_test_file"),
-            ],
-            widths=[0.16, 0.12, 0.72],
-        ),
-        caption("Bảng 13.1 — Phân bố mã nguồn (8 863 dòng C++ trong `src/` và `tests/`)."),
-        spacer(2),
-        h2("13.2. Vòng đời một tiến trình peer"),
-        numbered(
-            [
-                "Đọc tham số dòng lệnh; biến môi trường `TRACKER_URL`, `PEER_HOST` được dùng làm giá trị mặc định.",
-                "Sinh Peer ID; mở `data_dir/peer.db`, tạo schema, khôi phục trạng thái torrent.",
-                "Khởi động `UploadServer` (thread pool + accept loop) trên cổng đã cấp.",
-                "Nếu `--seed`: sinh metadata, đăng ký mảnh với `UploadServer`, announce lên tracker.",
-                "Nếu `--download`: nạp metadata, đăng ký tệp đích để có thể phục vụ mảnh ngay khi tải, rồi chạy "
-                "`DownloadManager`.",
-                "Luồng heartbeat announce lại bitfield mỗi 15 s.",
-                "Chờ tín hiệu dừng hoặc (với `--exit-after-download`) kết thúc ngay khi tải xong.",
-            ]
-        ),
-        code(
-            """# Chạy một swarm tối thiểu trên một máy
-./build/src/tracker/TrackerApp -p 8080 &
-./build/src/peer/PeerApp --tracker http://127.0.0.1:8080 -p 0 \\
-    --data-dir ./data/seed --seed ./ubuntu.iso --chunk-size 262144 &
-./build/src/peer/PeerApp --tracker http://127.0.0.1:8080 -p 0 \\
-    --data-dir ./data/leech --download ./ubuntu.iso.torrent.json \\
-    --output-dir ./downloads"""
-        ),
-        h2("13.3. Ba giao diện người dùng"),
-        rich(
-            "**Dòng lệnh** là giao diện chính và là thứ mà các kịch bản demo dùng: mọi thao tác đều có tham số, log "
-            "ghi ra stdout, và tiến trình có thể tắt bằng `SIGTERM`. **ncurses TUI** (`--tui`) hiển thị dashboard "
-            "với danh sách torrent, thanh tiến trình, bảng peer và panel log; phím `p` tạm dừng, `r` tiếp tục, `q` "
-            "thoát. **Web dashboard** (`--webui`) phục vụ một trang HTML tự chứa với lưới mảnh (piece map) cập nhật "
-            "real-time, cho phép upload tệp để seed và upload `.torrent.json` để tải."
-        ),
-        rich(
-            "Điểm thiết kế đáng chú ý: ba giao diện đều đọc cùng một `peer_node_status` và ba giao diện **không** sở "
-            "hữu logic riêng. Logger có cơ chế `set_sink`, nên TUI và Web có thể hứng log mà không cần sửa lời gọi "
-            "log ở bất kỳ đâu trong lõi."
-        ),
-        h2("13.4. Một số lựa chọn hiện thực"),
-        rich_bullets(
-            [
-                "**Băm tệp theo luồng.** `SHA256::hash_file` dùng `EVP_DigestUpdate` trong vòng lặp khối, nên một "
-                "tệp 100 GB không bao giờ bị nạp vào RAM. Bộ nhớ đỉnh đo được khi tải 100 MB chỉ khoảng 12 MB.",
-                "**Ghi mảnh theo offset.** Tệp đích được tạo trước với kích thước chính xác, mỗi mảnh ghi thẳng vào "
-                "offset `index × chunk_size`. Không cần tệp tạm cho từng mảnh, và ghép tệp là thao tác rỗng.",
-                "**SQLite WAL.** `PRAGMA journal_mode=WAL` cho phép nhiều luồng đọc trong lúc một luồng ghi, kết hợp "
-                "mutex ở lớp ứng dụng để tránh `database is locked`.",
-                "**`std::atomic` cho cờ trạng thái.** Các cờ như `stop_flag`, `connected`, `choked` là atomic để "
-                "đường nóng không phải lấy mutex.",
-                "**Log thay thế được (sink).** Lõi không biết ai hiển thị log; CLI in ra stdout, TUI đưa vào panel, "
-                "Web đưa vào bộ đệm cuộn.",
-            ]
-        ),
+    return [h1("13. Hiện thực"),
+        h2("13.1. Cấu trúc và công nghệ"),
+        table(["Thành phần", "Công nghệ / trách nhiệm"], [
+            ("src/common", "C++17; OpenSSL EVP cho SHA-256 [5]; metadata; wire protocol; socket wrapper; logger"),
+            ("src/tracker", "Crow HTTP server; PeerRegistry trong RAM, bảo vệ bằng mutex"),
+            ("src/peer", "Điều phối seed/download; thread/atomic/condition_variable; SQLite cục bộ; CLI/TUI/Web"),
+            ("tests", "GoogleTest cho chức năng, concurrency, fault và dữ liệu sai; CTest tổng hợp"),
+            ("deploy", "Dockerfile riêng cho peer và tracker; Compose 1 tracker + 3 peer, volume riêng"),
+            ("scripts", "Startup, tạo tải, fault injection, demo và benchmark; không là thành phần truyền dữ liệu"),
+        ], widths=[.22,.78]),
+        caption("Bảng 13.1 — Tổ chức hiện thực; không dùng số dòng làm chỉ số chất lượng."),
+        h2("13.2. Vòng đời một peer"),
+        numbered(["Nạp .env và biến môi trường cho tracker, cổng, data-dir và tham số tải; CLI có ưu tiên cao nhất.",
+                  "Sinh Peer ID; mở data_dir/peer.db và nạp tiến độ đã lưu.",
+                  "Khởi động UploadServer; seed thì sinh/nạp metadata và announce; download thì chuẩn bị tệp đích và đăng ký phục vụ phần đã có.",
+                  "Scheduler chạy nhiều phiên; callback sau mảnh verified cập nhật tiến độ và announce có throttle.",
+                  "Heartbeat định kỳ cập nhật registry; giao diện đọc snapshot trạng thái của PeerNode.",
+                  "Dừng có trật tự bằng tín hiệu; kill cưỡng bức chỉ dùng khi kiểm tra lỗi/resume."]),
+        rich("Thứ tự ưu tiên cấu hình là CLI, biến môi trường có giá trị không rỗng, tệp .env rồi mặc định. Biến rỗng được xử lý như chưa có giá trị; .env có thể cung cấp giá trị cho trường hợp này. Tham số số sai định dạng phải rơi về mặc định; bộ kiểm thử bổ sung xác nhận các giá trị như 42oops và 1.5 không bị nhận thành số nguyên hợp lệ."),
+        h2("13.3. Giao diện và quan sát"),
+        rich("CLI là đường chạy dễ tái lập qua tham số và log. TUI (`--tui`) trình bày danh sách tệp, peer và tiến độ trong terminal. Web dashboard (`--webui`) hiển thị piece map và điều khiển seed/download/pause/resume. `GET /api/status` trả Peer ID, danh sách torrent, completed_chunks, download_peers, upload_peers và bộ đếm dữ liệu; đây là công cụ chứng minh peer vẫn đang tải nhưng đã upload."),
+        rich("Mỗi tiến trình cần ghi log riêng với ánh xạ tên vai trò → máy/IP/port/Peer ID. Dòng khởi động liên kết log với node; timestamp hỗ trợ dựng lại diễn biến. Không giả định đồng hồ hai máy tạo được một thứ tự nhân quả chính xác; đối chiếu thêm File ID, chunk index và endpoint. Kịch bản demo ưu tiên bằng chứng trạng thái và hash thay cho chỉ nhìn thanh tiến độ."),
+        h2("13.4. Build và chạy lại"),
+        code("""cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release -j2
+./build-release/src/tracker/TrackerApp -p 8080
+# Terminal khác: IP_A là IP LAN của máy chạy tracker
+./build-release/src/peer/PeerApp --tracker http://IP_A:8080 \\
+  --announce-ip IP_A -p 6881 --data-dir ./demo/seed \\
+  --seed ./demo/demo.bin --chunk-size 262144"""),
+        h2("13.5. Trạng thái lưu trữ"),
+        rich("Mỗi peer có DB và tệp riêng, không mount chung DB giữa các node. Ghi dữ liệu theo offset giúp nhận mảnh không theo thứ tự nhưng giữ đúng vị trí trong tệp. Các thao tác FileManager được khóa cục bộ; do đó nhiều kết nối mạng không có nghĩa các lần ghi đĩa đều chạy song song. WAL hỗ trợ giao dịch SQLite trên một máy [4], không biến SQLite thành database phân tán."),
     ]
+
 
 
 def section_14_testing():
-    return [
-        h1("14. Kiểm thử và kết quả"),
-        h2("14.1. Bộ kiểm thử"),
-        rich(
-            "Đề bài yêu cầu tối thiểu 8 bài chức năng, 2 bài đồng thời, 2 bài lỗi–phục hồi và 2 bài bảo mật/dữ liệu "
-            "sai, cộng một thí nghiệm hiệu năng. Bộ kiểm thử của đồ án vượt mức này ở mọi hạng mục:"
-        ),
-        table(
-            ["Nhóm", "Tệp", "Số bài", "Nội dung chính"],
-            [
-                ("Chức năng", "test_sha256 (2), test_metadata (1), test_file_manager (1), test_protocol (6, gồm 2 NetTest), test_database (3), test_state_manager (1), test_peer_registry (5), test_tracker_server (1)", "20", "Băm, sinh/đọc metadata, đọc-ghi mảnh, roundtrip khung tin, CRUD SQLite, bitfield, registry, end-to-end tracker"),
-                ("Đồng thời", "test_concurrent_download", "9", "2 seeder/1 leecher, 1 seeder/2 leecher, leecher phục vụ leecher, full-duplex, giới hạn slot, peer tham gia muộn, stress lặp, giao dịch cổng"),
-                ("Lỗi và phục hồi", "test_fault_recovery", "4 (3 chạy, 1 chỉ Windows)", "seeder chết giữa chừng, chỉ có nguồn hỏng, resume sau kill"),
-                ("Bảo mật / dữ liệu sai", "test_invalid_data", "10", "khung quá lớn, khung cụt, handshake sai, cổng ngoài phạm vi, chỉ số ngoài phạm vi, không treo"),
-                ("Hiệu năng", "scripts/bench.sh", "9 cấu hình", "3 nguồn × 3 kích thước × 6 cấu hình đồng thời (mục 15)"),
-            ],
-            widths=[0.17, 0.34, 0.12, 0.37],
-        ),
-        caption("Bảng 14.1 — Bộ kiểm thử theo nhóm yêu cầu của đề bài."),
-        spacer(2),
-        h2("14.2. Kết quả chạy"),
-        rich(
-            "Chạy `ctest --output-on-failure` trên bản build Debug có ASan + UBSan: **42 bài được đăng ký, 41 bài "
-            "chạy và đạt, 1 bài bị bỏ qua có chủ đích.** Bài bị bỏ qua là "
-            "`RealProcessCrashResumesFromPersistedSqliteState`, chỉ biên dịch trên Windows vì cần kill tiến trình con "
-            "theo cách Windows; trên Linux, cùng hành vi này được kiểm chứng bởi kịch bản demo 6 (mục 14.3). Toàn bộ "
-            "chạy hoàn tất trong 7,63 giây."
-        ),
-        code(
-            """$ ctest --output-on-failure
-...
-41/42 Test #41: FaultRecoveryTest.CorruptedOnlySourceIsRejectedAndDownloadFails  Passed  2.36 sec
-42/42 Test #42: FaultRecoveryTest.RealProcessCrashResumesFromPersistedSqliteState  ***Skipped
-100% tests passed out of 42
-Total Test time (real) =   7.63 sec"""
-        ),
-        rich(
-            "Một điểm đáng chú ý về **thời gian chạy test**: bộ test không chỉ kiểm tra hàm thuần mà còn khởi động "
-            "tracker và peer thật trên cổng loopback, nên nó phát hiện được lỗi tích hợp mà unit test thuần bỏ sót. "
-            "Ví dụ bài `PeerRegisteringAfterStartIsAdoptedPromptly` đặt ngưỡng 1 giây cho việc một peer xuất hiện "
-            "giữa lúc tải phải được phát hiện; ngưỡng này đã bắt được một lỗi thật trong đó phiên đã thiết lập chỉ "
-            "đọc bitfield lúc kết nối và không bao giờ thấy peer mới trở nên hữu ích."
-        ),
-        h2("14.3. Bảy kịch bản demo bắt buộc"),
-        rich(
-            "`scripts/demo_full.sh` chạy bảy kịch bản của đề bài trên các binary thật (bản Release), mỗi kịch bản "
-            "dùng cổng và thư mục riêng, chỉ kill những PID nó tự tạo. Kết quả lần chạy được ghi lại nguyên văn:"
-        ),
-        table(
-            ["#", "Kịch bản", "Bằng chứng đo được"],
-            [
-                ("1", "Đăng ký tracker và khám phá", "`/peers` trả về 2 peer cho đúng `file_id`"),
-                ("2", "Tải một nguồn, xác minh SHA-256", "Mã băm tệp kết quả khớp nguồn"),
-                ("3", "Tải đa nguồn", "2 peer cùng góp mảnh; mã băm khớp"),
-                ("4", "Seeder chết, chuyển nguồn", "Kill seeder giữa chừng, phần còn lại lấy từ seeder sống, mã băm khớp"),
-                ("5", "Phát hiện mảnh hỏng", "22 mảnh hỏng bị phát hiện và tải lại; mã băm khớp"),
-                ("6", "Resume sau khi bị kill", "Kill ở mốc 10/129 mảnh; khởi động lại chỉ tải 111/129 mảnh; mã băm khớp"),
-                ("7", "Tracker loại peer quá hạn", "Peer chết bị xóa khỏi `/peers` sau 50 s (ngưỡng 45 s, quét 10 s)"),
-            ],
-            widths=[0.05, 0.33, 0.62],
-        ),
-        caption("Bảng 14.2 — Kết quả bảy kịch bản demo; cả bảy đều PASS."),
-        spacer(2),
-        code(
-            """$ ./scripts/demo_full.sh
-================= demo results =================
-DEMO 1  Tracker registration and discovery  PASS: /peers returned 2 peers ...
-DEMO 2  Single-source download with SHA-256  PASS: sha256 6b3e7823... matches source
-DEMO 3  Multi-source download                PASS: 2 peers contributed chunks ...
-DEMO 4  Seeder failure with failover         PASS: killed pid ... mid-transfer ...
-DEMO 5  Corrupted chunk detection            PASS: 22 corrupted chunk(s) detected ...
-DEMO 6  Crash resume from persisted state    PASS: killed at 10/129 ..., refetched 111 of 129 ...
-DEMO 7  Tracker expiry after 45s             PASS: stale peer dropped after 50s ...
-================================================
-ALL 7 DEMOS PASS"""
-        ),
-        rich(
-            "Điểm quan trọng với hội đồng: các kịch bản không chỉ kiểm tra “chạy xong” mà kiểm tra **bằng chứng của "
-            "cơ chế**. Kịch bản 3 thất bại nếu tệp đúng nhưng chỉ một peer góp mảnh; kịch bản 6 thất bại nếu tệp "
-            "đúng nhưng khởi động lại tải lại toàn bộ (đó là tải mới, không phải resume); kịch bản 7 thất bại nếu "
-            "thời gian loại ngoài khoảng hợp lý."
-        ),
+    return [h1("14. Kiểm thử và kết quả"),
+        h2("14.1. Nguồn bằng chứng"),
+        rich('Kết quả được lưu trong `docs/evidence/ctest-release.log` và `docs/evidence/ctest-debug.log`, trên mã nguồn được định danh trong `docs/evidence/validation.json`. Cả hai cấu hình đăng ký 48 test: 47 PASS, 1 SKIP dành riêng cho Windows. Bản Debug bật ASan/UBSan. Phụ lục 19.2 lưu danh sách từng test; các kết quả phản ánh cấu hình và phiên bản được kiểm thử.'),
+        table(["Nhóm / yêu cầu §9", "Số bài đăng ký", "Kết quả đã lưu", "Phạm vi"], [
+            ("Chức năng/cấu hình: tối thiểu 8", "26", "26 PASS", "20 bài lõi + 6 EnvTest: nạp .env, ưu tiên môi trường, giá trị trống, số sai định dạng và clamping"),
+            ("Đồng thời: tối thiểu 2", "9", "9 PASS", "Nhiều leecher/nguồn; peer chưa đủ tệp phục vụ peer khác; slot và stress"),
+            ("Lỗi–phục hồi: tối thiểu 2", "3", "2 PASS, 1 SKIP", "Mất nguồn và nguồn hỏng; crash-resume chỉ hỗ trợ Windows trong test"),
+            ("Bảo mật/dữ liệu sai: tối thiểu 2", "10", "10 PASS", "Oversize/truncated frame, malformed handshake, index sai và slot leak"),
+            ("Tổng CTest", "48", "47 PASS, 1 SKIP", "SKIP được tách khỏi số bài thực sự đã chạy và đạt"),
+            ("Hiệu năng: tối thiểu 1 thí nghiệm", "12 cấu hình", "CSV: verified=yes ở 12 dòng", "3 số nguồn + 3 kích thước + 6 cấu hình đồng thời"),
+        ], widths=[.25,.13,.21,.41]),
+        caption("Bảng 14.1 — Mức bao phủ tối thiểu và kết quả từ hiện vật đã lưu."),
+        h2("14.2. Hai tình huống đồng thời tiêu biểu"),
+        rich("**Hai nguồn, một leecher.** TwoSeedersOneLeecher kiểm tra nhiều nguồn có đóng góp và đầu ra đúng hash; số phiên không vượt giới hạn. Không kết luận đa nguồn chỉ vì /peers trả hai địa chỉ: phải có ít nhất hai Peer ID với chunks_downloaded > 0 và cùng nằm trong phiên tải."),
+        rich("**Vừa tải vừa phục vụ.** LeecherServesAnotherLeecher và PartialPeersServeEachOtherWhileDownloading kiểm tra trao đổi dữ liệu giữa peer chưa hoàn tất. Trong demo, cần chụp cùng thời điểm completed_chunks < num_chunks và uploaded_bytes > 0 hoặc upload_peers có chunks_uploaded > 0; chỉ thấy peer upload sau 100% không đủ chứng minh yêu cầu này."),
+        h2("14.3. Các lỗi và dữ liệu sai"),
+        rich("SeederDeathMidDownloadFailsOverToSecondSeeder: ngắt nguồn giữa phiên và hoàn tất từ nguồn còn sống, đầu ra đúng hash. CorruptedOnlySourceIsRejectedAndDownloadFails: khi chỉ còn nguồn hỏng thì phải báo lỗi và không coi tệp sai là thành công. CorruptedChunksAreDetectedRequeuedAndRefetched thuộc nhóm concurrency nhưng bổ sung bằng chứng lỗi dữ liệu; không cộng nó lần nữa vào tổng số test."),
+        rich("InvalidDataTest kiểm tra giới hạn cấp phát trước length quá lớn, frame cụt không treo, bắt tay sai bị từ chối và REQUEST ngoài phạm vi không làm rò slot. RealProcessCrashResumesFromPersistedSqliteState SKIP trên Linux với thông báo 'process kill/resume is implemented for Windows only'; cần kịch bản restart độc lập để xác nhận hành vi đó trên LAN."),
+        h2("14.4. Đối chiếu bảy tình huống DS02 §6.4"),
+        table(["Tình huống bắt buộc", "Điều kiện chấp nhận và bằng chứng"], [
+            ("Tạo metadata và chia sẻ", "Metadata đúng trường; cùng File ID; seeder có đủ mảnh trong /peers"),
+            ("Tải song song từ ít nhất 2 peer", "≥2 nguồn góp mảnh; ít nhất hai phiên có hoạt động trong thời gian giao nhau; hash cuối đúng"),
+            ("Upload khi chưa tải xong", "Snapshot cùng thời điểm: 0 < completed_chunks < num_chunks và uploaded_bytes > 0"),
+            ("Dừng nguồn giữa lúc tải", "Lưu PID và thời điểm kill; tiến độ còn dưới 100%; session nguồn lỗi"),
+            ("Chuyển sang nguồn khác", "Sau kill vẫn tăng verified; log/state xác định nguồn còn lại góp mảnh"),
+            ("Phát hiện mảnh sai", "Có SHA-256 mismatch; mảnh không được chấp nhận từ nguồn sai; retry từ nguồn tốt"),
+            ("Ghép và xác minh hash tổng", "Ghi đúng offset; sha256sum đầu ra khớp file_hash, không chỉ đúng kích thước"),
+        ], widths=[.35,.65]),
+        caption("Bảng 14.2 — Tiêu chí demo trực tiếp; không đồng nhất với số thứ tự demo_full.sh."),
+        rich('`scripts/demo_full.sh` đã chạy đạt 7/7 trên bản Release; log đầy đủ được lưu tại docs/evidence/demo-full.log. Các trường hợp gồm discovery, tải một/đa nguồn, mất seeder, mảnh hỏng, crash-resume và lease. Kết quả crash-resume của script bổ sung minh chứng Linux cho bài CTest bị SKIP. Các kịch bản không khớp một-một với bảy dòng §6.4: yêu cầu upload khi chưa hoàn tất được kiểm tra riêng bởi các test đồng thời. Việc diễn tập thực tế trên hai máy LAN vẫn là bước triển khai tách biệt với các phép đo loopback này.'),
     ]
+
 
 
 def section_15_performance():
-    return [
-        h1("15. Đánh giá hiệu năng"),
-        h2("15.1. Phương pháp"),
-        rich(
-            "Môi trường đo: Intel Core i5-11300H (8 luồng), 15 GB RAM, EndeavourOS, GCC 16.1.1, bản **Release** "
-            "(`-O3`, không sanitizer). Mỗi phép đo khởi động tiến trình peer từ đầu đến khi thoát và xác minh SHA-256 "
-            "của tệp kết quả, nên con số bao gồm cả chi phí khởi động, đọc metadata, khám phá peer và ghi đĩa — đúng "
-            "thứ người dùng cảm nhận."
-        ),
-        rich(
-            "**Vì sao phải thêm độ trễ nhân tạo.** Trên loopback, đĩa và mạng cùng một máy nhanh hơn lõi mạng rất "
-            "nhiều: tải 100 MB hoàn tất trong khoảng 0,5 giây và mọi cấu hình cho cùng một con số. Để đo được khả "
-            "năng mở rộng, seeder được đặt `--chunk-delay-ms 50`, tức mỗi mảnh phục vụ chậm 50 ms — mô phỏng một "
-            "đường truyền WAN. Với 400 mảnh của tệp 100 MB, một nguồn tốn lý thuyết 20 s; con số này cho phép kiểm "
-            "tra chéo kết quả đo."
-        ),
-        h2("15.2. Khả năng mở rộng theo số nguồn"),
-        table(
-            ["Nguồn", "Kích thước", "Thời gian (s)", "Thông lượng (MB/s)", "Tăng tốc", "Bộ nhớ đỉnh (MB)"],
-            [
-                ("1", "100 MB", "20,53", "4,9", "1,00×", "12,2"),
-                ("2", "100 MB", "10,54", "9,5", "1,95×", "12,9"),
-                ("3", "100 MB", "7,05", "14,2", "2,91×", "13,8"),
-            ],
-            widths=[0.13, 0.16, 0.20, 0.22, 0.13, 0.16],
-        ),
-        caption("Bảng 15.1 — Tải 100 MB với 1, 2 và 3 seeder, mỗi seeder giới hạn 1 slot."),
-        spacer(2),
-        rich(
-            "**Kết quả: gần tuyến tính.** Tăng tốc đo được là 1,95× với hai nguồn và 2,91× với ba nguồn — tức hiệu "
-            "suất song song đạt 97 % lý thuyết. Đây là bằng chứng định lượng rằng mảnh được tải thật sự song song và "
-            "rằng các seeder độc lập, không có khóa chung nào giữa đường tải của các peer khác nhau."
-        ),
-        h2("15.3. Chi phí cố định theo kích thước tệp"),
-        table(
-            ["Kích thước", "Số mảnh", "Thời gian (s)", "Thời gian lý thuyết", "Thông lượng (MB/s)"],
-            [
-                ("10 MB", "40", "2,51", "2,00", "4,0"),
-                ("50 MB", "200", "10,55", "10,00", "4,7"),
-                ("100 MB", "400", "20,55", "20,00", "4,9"),
-            ],
-            widths=[0.17, 0.13, 0.20, 0.25, 0.25],
-        ),
-        caption("Bảng 15.2 — Một nguồn, độ trễ 50 ms/mảnh; cột lý thuyết là num_chunks × 50 ms."),
-        spacer(2),
-        rich(
-            "Hiệu số giữa thời gian đo và thời gian lý thuyết là **khoảng 0,5 s, không đổi** ở cả ba kích thước — đó "
-            "chính là chi phí cố định của một phiên: khởi động tiến trình, sinh/đọc metadata, khám phá peer, bắt tay "
-            "và xác minh ghi đĩa. Vì chi phí cố định không tăng theo kích thước tệp, tệp càng lớn thì thông lượng "
-            "càng tiến gần giới hạn của đường truyền (4,0 → 4,7 → 4,9 MB/s). Đây là biểu hiện định lượng của việc "
-            "chia mảnh: chi phí chia nhỏ chỉ trả một lần."
-        ),
-        h2("15.4. Đồng thời: nhiều leecher trên một swarm"),
-        table(
-            ["Cấu hình", "Tổng dữ liệu", "Leecher chậm nhất (s)", "Thông lượng tổng (MB/s)"],
-            [
-                ("1 leecher / 1 slot", "20 MB", "4,55", "4,4"),
-                ("4 leecher / 1 slot", "80 MB", "4,56", "17,6"),
-                ("8 leecher / 1 slot", "160 MB", "5,04", "31,7"),
-                ("1 leecher / 8 slot", "20 MB", "4,55", "4,4"),
-                ("4 leecher / 8 slot", "80 MB", "2,55", "31,4"),
-                ("8 leecher / 8 slot", "160 MB", "2,04", "78,3"),
-            ],
-            widths=[0.27, 0.18, 0.28, 0.27],
-        ),
-        caption("Bảng 15.3 — Tệp 20 MB, seeder có 1 hoặc 8 slot tải lên."),
-        spacer(2),
-        rich(
-            "Cột thời gian là leecher **chậm nhất** — thời gian thực để cả swarm nhận đủ tệp. Ba điều đáng chú ý:"
-        ),
-        rich_bullets(
-            [
-                "**Một slot không làm nghẽn swarm.** 8 leecher vẫn hoàn tất trong 5,04 s (so với 4,55 s cho một "
-                "leecher), tức chậm hơn chỉ 11 %. Nguyên nhân đo được từ log: leecher tải xong mảnh nào thì phục vụ "
-                "ngay mảnh đó cho leecher khác. Với 8 leecher, log của leecher cuối ghi **hai** peer đã góp mảnh, "
-                "trong đó peer thứ hai là một leecher chứ không phải seeder. Đây là đặc tính cốt lõi của BitTorrent "
-                "và là lý do mô hình P2P mở rộng được.",
-                "**Tám slot cho thông lượng gấp 18×.** Cùng 8 leecher, seeder 8 slot đạt 78,3 MB/s so với 4,4 MB/s "
-                "của một leecher — tức giới hạn slot là nút thắt thật sự khi seeder có băng thông.",
-                "**Ai cũng phải trả giá khi chờ.** Với 1 slot, leecher thứ 8 phải chờ các leecher trước dùng xong "
-                "slot, nhưng vì leecher-to-leecher bù đắp, cái giá chỉ là ~0,5 s.",
-            ]
-        ),
-        rich(
-            "Hạn chế của phép đo này: tất cả tiến trình nằm trên một máy nên chia sẻ cùng ổ đĩa và bộ nhớ đệm trang. "
-            "Số liệu vì vậy thể hiện **hành vi của lõi phân tán**, không phải băng thông mạng thật; một phép đo WAN "
-            "sẽ cần nhiều máy hoặc `tc netem`."
-        ),
+    import csv
+    from pathlib import Path
+    rows = list(csv.DictReader((ROOT / "docs/bench/results.csv").open()))
+    sources=[r for r in rows if r['dimension']=='sources']
+    sizes=[r for r in rows if r['dimension']=='filesize']
+    concurrency=[r for r in rows if r['dimension']=='concurrency']
+    base=int(sources[0]['elapsed_ms'])
+    fmt=lambda x: ("%.3f" % x).replace('.',',')
+    return [h1("15. Đánh giá hiệu năng"),
+        h2("15.1. Thiết kế thí nghiệm và đơn vị"),
+        rich("Nguồn số liệu là `docs/bench/results.csv` có 12 dòng, được lưu từ scripts/bench.sh. Script chạy các tiến trình độc lập trên loopback, bản Release, mặc định chunk 262144 byte (256 KiB), seeder delay 50 ms/mảnh; phép đo bắt đầu trước khi chạy leecher và kết thúc khi tiến trình hoàn tất. Download giới hạn 8 nguồn, pipeline 4 trong cấu hình benchmark; mỗi nguồn ở thí nghiệm số nguồn có 1 upload slot."),
+        rich("Môi trường được ghi nhận kèm bộ số liệu: Intel Core i5-11300H, 8 luồng, khoảng 15 GiB RAM, EndeavourOS, GCC 16.1.1. CSV không tự ghi CPU/OS/compiler hoặc thời điểm chạy, vì vậy đây là mô tả môi trường kèm phép đo, chưa phải manifest tự xác thực. Release cache hiện có xác nhận -O3 -DNDEBUG. Bộ số liệu chưa kèm log lặp lại cho từng cấu hình."),
+        rich("Chuẩn hóa đơn vị: 1 MiB = 1048576 byte; 1 KiB = 1024 byte. CSV 104857600 byte là **100 MiB**. Thông lượng Q = bytes / 1048576 / (elapsed_ms / 1000), đơn vị MiB/s; speedup S_p = T_1/T_p; hiệu suất E_p = S_p/p. Bộ nhớ VmHWM tính bằng KiB trong hiện vật, chia 1024 để ra MiB."),
+        h2("15.2. Tăng số nguồn"),
+        table(["Nguồn", "Tệp", "Thời gian (s)", "MiB/s", "Speedup", "RSS (MiB)"],
+              [(r['configuration'].split('-')[0],str(int(r['bytes'])//1048576)+' MiB',fmt(int(r['elapsed_ms'])/1000),fmt(int(r['bytes'])/1048576/(int(r['elapsed_ms'])/1000)),fmt(base/int(r['elapsed_ms']))+'×',fmt(int(r['peak_rss_kb'])/1024)) for r in sources], widths=[.10,.17,.20,.17,.18,.18]),
+        caption("Bảng 15.1 — Tính lại trực tiếp từ CSV; contributor tương ứng 1, 2 và 3 nguồn."),
+        rich('Trong điều kiện đo, tăng số nguồn giúp giảm thời gian hoàn tất; speedup được tính từ thời gian một nguồn chia thời gian tương ứng trong Bảng 15.1. Kết quả phù hợp với việc phục vụ độc lập khi mỗi nguồn bị thêm cùng độ trễ. Không suy ra hệ thống luôn tăng tốc tuyến tính: ghi tệp vẫn có khóa và WAN có thể bị giới hạn bởi uplink, RTT, disk hoặc CPU.'),
+        h2("15.3. Thay đổi kích thước tệp"),
+        table(["Tệp (MiB)", "Số mảnh", "Thời gian (s)", "MiB/s", "Delay thuần (s)"],
+              [(str(int(r['bytes'])//1048576),str((int(r['bytes'])+262143)//262144),fmt(int(r['elapsed_ms'])/1000),fmt(int(r['bytes'])/1048576/(int(r['elapsed_ms'])/1000)),fmt(((int(r['bytes'])+262143)//262144)*.05)) for r in sizes], widths=[.18,.15,.23,.20,.24]),
+        caption("Bảng 15.2 — Một nguồn; cột delay thuần là số mảnh × 50 ms, không phải dự báo WAN."),
+        rich('Hiệu số giữa thời gian đo và tổng delay thuần gồm chi phí khởi động, scheduler, socket, đĩa và xác minh. Dữ liệu hiện có không tách riêng từng thành phần hoặc chứng minh chi phí luôn cố định. Hash toàn tệp vẫn có chi phí đọc O(kích thước tệp).'),
+        h2("15.4. Nhiều leecher đồng thời"),
+        table(["Cấu hình", "Tổng MiB", "Thời gian cả nhóm (s)", "MiB/s tổng"],
+              [(r['configuration'],str(int(r['bytes'])//1048576),fmt(int(r['elapsed_ms'])/1000),fmt(int(r['bytes'])/1048576/(int(r['elapsed_ms'])/1000))) for r in concurrency], widths=[.31,.16,.29,.24]),
+        caption("Bảng 15.3 — Tệp 20 MiB/leecher; tổng bytes = kích thước tệp × số leecher."),
+        rich("Thời gian lấy mốc khi cả nhóm hoàn tất; thông lượng là dữ liệu ứng dụng cộng trên toàn nhóm chia thời gian, không phải tốc độ uplink của seeder hay băng thông từng máy. CSV ghi contributors='-' và RSS=0 ở nhóm này, nghĩa là không có số đo tương ứng để kết luận. Việc leecher hỗ trợ nhau được kiểm chứng riêng bằng test và snapshot demo, không suy ra chỉ từ bảng thông lượng."),
+        h2("15.5. Hạn chế đo lường và cách bổ sung"),
+        rich("Mỗi cấu hình chỉ có một mẫu; không có median, p95, độ lệch chuẩn hay khoảng tin cậy. Độ trễ nhân tạo là thời gian chờ ở ứng dụng, không mô phỏng đầy đủ RTT, mất gói và băng thông WAN. Các tiến trình chia sẻ disk/cache của một máy. Thứ tự chạy và nguồn dữ liệu ngẫu nhiên cũng có thể tác động kết quả."),
+        rich("Để đánh giá chặt hơn: chạy ≥5 lần/cấu hình với warm-up riêng, lưu commit và môi trường; đo median/p95, CPU, RSS và NIC bytes; triển khai hai máy có IP thật; đo 1–3 nguồn với cùng file và chunk_size; kiểm tra hash sau mỗi lần. Nếu dùng netem phải ghi cấu hình mạng. Bộ dữ liệu hiện có đáp ứng một thí nghiệm hiệu năng ở quy mô nguyên mẫu, chưa cho phép kết luận về quy mô lớn."),
     ]
+
 
 
 def section_16_limitations():
-    return [
-        h1("16. Hạn chế và hướng phát triển"),
-        h2("16.1. Hạn chế đã biết"),
-        table(
-            ["Hạn chế", "Ảnh hưởng", "Hướng khắc phục"],
-            [
-                ("Tracker là điểm chết đơn", "Peer mới không khám phá được swarm khi tracker sập; các luồng đang chạy vẫn tiếp tục",
-                 "Nhiều tracker + bầu chọn; DHT"),
-                ("Peer ID không bền giữa các lần chạy", "Lịch sử peer không gắn với danh tính ổn định",
-                 "Sinh và lưu Peer ID trong `data_dir` ở lần chạy đầu"),
-                ("Không TLS, không mã hóa kênh", "Nội dung và announce có thể bị nghe lén trên mạng không tin cậy",
-                 "TLS cho HTTP; handshake trao đổi khóa cho TCP"),
-                ("Không xác thực announce", "Peer có thể mạo danh `peer_id` khác",
-                 "Chữ ký số trên mỗi announce"),
-                ("Web dashboard không có xác thực", "Bất kỳ ai truy cập được cổng dashboard đều upload/tải được",
-                 "Token truy cập; bind loopback mặc định"),
-                ("Không giới hạn băng thông (rate limiting)", "Một peer có thể chiếm toàn bộ slot",
-                 "Token bucket theo peer; tit-for-tat"),
-                ("Chưa có DHT, magnet link, mã hóa", "Phụ thuộc tracker và kênh ngoài để chia sẻ metadata",
-                 "Đây là các tính năng nâng cao của đề bài"),
-            ],
-            widths=[0.25, 0.42, 0.33],
-        ),
-        caption("Bảng 16.1 — Các hạn chế được ghi nhận thẳng thắn."),
-        spacer(2),
-        h2("16.2. Hướng phát triển"),
-        numbered(
-            [
-                "**Bền hóa danh tính** — lưu Peer ID trong thư mục dữ liệu để lịch sử peer có ý nghĩa qua nhiều lần chạy.",
-                "**Nhiều tracker và failover tracker** — danh sách tracker cấu hình được; tự chuyển khi một tracker chết, "
-                "đo thời gian chuyển đổi như một chỉ số mới.",
-                "**TLS và xác thực** — TLS cho kênh tracker; chữ ký announce bằng khóa công khai của peer.",
-                "**Tit-for-tat và giới hạn băng thông** — chọn peer dựa trên lịch sử đóng góp để chống ký sinh, đo "
-                "ảnh hưởng tới thời gian tải.",
-                "**Mô phỏng mạng thật** — dùng `tc netem` để thêm trễ, mất gói và giới hạn băng thông, thay cho "
-                "`--chunk-delay-ms`.",
-                "**Bền hóa thí nghiệm hiệu năng** — đo thêm độ trễ từng mảnh (p50/p95) và mức dùng CPU, không chỉ "
-                "thời gian tổng.",
-            ]
-        ),
+    return [h1("16. Hạn chế và hướng phát triển"),
+        h2("16.1. Các giới hạn ảnh hưởng trực tiếp"),
+        table(["Hạn chế", "Hệ quả", "Hướng khắc phục"], [
+            ("Thiếu xác thực và ACL", "Chưa đáp ứng trọn vẹn §4.5; Peer ID và dashboard có thể bị dùng trái phép", "Token/khóa peer, ACL theo File ID; kiểm thử từ chối truy cập"),
+            ("Hardening đường dẫn mới, giới hạn HTTP chưa đầy đủ", "Guard mới chưa có log kiểm chứng; payload lớn vẫn cần quota", "Test traversal/symlink trên bản cuối; quota và body limit"),
+            ("Tracker đơn, registry trong RAM", "Discovery bị ngừng khi tracker lỗi; restart cần re-announce", "Nhiều tracker; sao chép trạng thái hoặc DHT"),
+            ("Peer ID chưa bền; announce chưa có version", "Restart sinh ID mới; announce cũ có thể cập nhật snapshot lùi", "Persist identity; epoch/sequence và xác minh danh tính"),
+            ("File ID chỉ hash nội dung", "Cùng tệp nhưng metadata chia mảnh khác có thể bị xếp cùng swarm", "Định danh gồm bố cục metadata; kiểm tra cùng layout"),
+            ("Không NAT traversal/TLS", "Cần endpoint TCP truy cập được; nội dung có thể bị nghe lén", "Cấu hình NAT/VPN phù hợp; TLS; không gán đây là tính năng hiện có"),
+            ("Chưa có công bằng theo đóng góp", "CHOKE/UNCHOKE giới hạn slot, chưa là tit-for-tat", "Chính sách theo tốc độ/đóng góp; rate limit"),
+            ("Chưa có manifest đo và nhiều mẫu", "Không đánh giá được độ biến thiên hoặc độ ổn định WAN", "Lưu môi trường/commit/log; lặp nhiều lần trên nhiều máy"),
+        ], widths=[.29,.35,.36]),
+        caption("Bảng 16.1 — Hạn chế gắn với hậu quả và việc cần làm cụ thể."),
+        h2("16.2. Thứ tự ưu tiên"),
+        rich("Ưu tiên đầu tiên là các yêu cầu bắt buộc còn thiếu về bảo mật và bộ minh chứng trên commit nộp cuối. Tiếp theo là danh tính bền, validation metadata và File ID bao gồm bố cục; sau đó mới tăng khả dụng tracker, công bằng/băng thông và đo trên mạng thực. DHT, magnet link, replicated tracker và mã hóa là các hướng nâng cao, không được ghi như đã hiện thực."),
+        rich("Rarest-first và resume đã có trong thiết kế hiện tại, nhưng cần chứng minh bằng test phù hợp. Không đưa chúng vào danh sách 'chưa có' cùng DHT. Việc giữ lại giới hạn có căn cứ giúp tách mức nguyên mẫu học thuật khỏi một sản phẩm BitTorrent triển khai công cộng."),
     ]
+
 
 
 def section_17_conclusion():
-    return [
-        h1("17. Kết luận"),
-        rich(
-            "Đồ án đã xây dựng một hệ thống chia sẻ tệp P2P hoàn chỉnh theo mô hình BitTorrent: tracker chỉ quản lý "
-            "siêu dữ liệu, peer tải và phục vụ mảnh song song, toàn bộ nội dung được xác minh bằng SHA-256 từng mảnh "
-            "và toàn tệp. Hệ thống gồm các tiến trình độc lập giao tiếp qua socket, không dùng bộ nhớ chung hay tệp "
-            "chia sẻ làm kênh giao tiếp, và chạy được cả trên Linux lẫn Windows."
-        ),
-        rich(
-            "Ba nhóm kết quả chính. **Thứ nhất, tính đúng đắn:** 41 bài kiểm thử tự động và bảy kịch bản demo bắt buộc "
-            "đều đạt, bao gồm các tình huống khó như seeder chết giữa chừng, mảnh hỏng, và tiến trình bị kill giữa "
-            "lúc tải. **Thứ hai, khả năng mở rộng:** thời gian tải giảm gần tuyến tính theo số nguồn (1,95× với hai "
-            "nguồn, 2,91× với ba nguồn), và một seeder chỉ có một slot vẫn phục vụ tám leecher trong thời gian gần như "
-            "không đổi nhờ leecher-to-leecher — đặc tính mở rộng đặc trưng của P2P. **Thứ ba, chi phí:** bộ nhớ đỉnh "
-            "khoảng 12–14 MB cho tệp 100 MB, chi phí cố định của một phiên khoảng 0,5 s."
-        ),
-        rich(
-            "Bài học lớn nhất về hệ phân tán là cách tách hai loại nhất quán: chấp nhận nhất quán cuối cùng cho thông "
-            "tin “ai giữ gì” nhưng giữ nhất quán mạnh cho nội dung. Cách tách này loại bỏ nhu cầu khóa phân tán và "
-            "đồng hồ logic, đồng thời vẫn cho kết quả đúng tuyệt đối về dữ liệu. Bài học thứ hai là các tham số "
-            "timeout có quan hệ với nhau: `choke_wait_ms` phải nhỏ hơn `io_timeout_ms` của phía tải, nếu không một "
-            "seeder khỏe nhưng đang bận sẽ bị coi là chết — một lỗi chỉ lộ ra khi chạy tải đồng thời ở quy mô lớn."
-        ),
+    return [h1("17. Kết luận"),
+        rich("Đồ án DS02 đã hiện thực nguyên mẫu P2P với tracker quản lý danh sách peer, metadata SHA-256, tải mảnh đa nguồn và phục vụ mảnh đã xác minh. Mọi node giao tiếp qua mạng; state và tệp của từng peer được lưu riêng. Mô hình demo phải có ít nhất 3 peer ngoài tracker, kể cả khi chỉ dùng hai máy vật lý."),
+        rich('Bằng chứng đã lưu gồm 47 bài kiểm thử đạt ở mỗi cấu hình Release và Debug, một bài CTest crash-resume bị bỏ qua trên Linux, 7/7 demo tự động, 15 kiểm tra HTTP bổ sung và 12 cấu hình hiệu năng có hash đúng. Script demo xác nhận crash-resume trên tiến trình Linux thật. Các phép đo vẫn sử dụng loopback, chưa xác nhận hiệu năng WAN hoặc quy mô lớn; bảy tiêu chí DS02 được đối chiếu riêng ở Bảng 14.2.'),
+        rich("Bài học thiết kế là tách trạng thái khám phá có thể trễ khỏi bất biến toàn vẹn nội dung, phân biệt timeout nghi ngờ lỗi với bằng chứng peer chết, và kiểm tra lại dữ liệu khi phục hồi checkpoint. Hash không thay cho xác thực, bitfield một chủ sở hữu không mặc nhiên là CRDT, và WAL không thay cho đồng bộ phân tán."),
+        rich("Các cơ chế lõi phục vụ mục tiêu học tập về discovery, concurrency, consistency và recovery. Mức đáp ứng bảo mật vẫn một phần; cần hoàn thiện xác thực, ACL và kiểm soát đường dẫn trước khi tuyên bố đáp ứng toàn bộ yêu cầu chung. Kết quả cần được chạy lại và gắn với commit/tag nộp cuối để tránh nhầm hiện vật cũ với bản đang thay đổi."),
     ]
+
 
 
 def section_18_references():
-    return [
-        h1("18. Tài liệu tham khảo"),
-        numbered(
-            [
-                "B. Cohen, *Incentives Build Robustness in BitTorrent Systems*, Workshop on Economics of Peer-to-Peer "
-                "Systems, 2003. — Cơ chế choke/unchoke, tit-for-tat và lý do chia mảnh.",
-                "BitTorrent Protocol Specification v1.0 (BEP 3), BitTorrent Enhancement Proposals. — Cấu trúc "
-                "metainfo và giao thức trao đổi mảnh.",
-                "CrowCpp, *Crow — A Fast and Easy to Use C++ Microframework for Web*, v1.3.4. — Máy chủ HTTP của "
-                "tracker và dashboard.",
-                "nlohmann, *JSON for Modern C++*, v3.x. — Tuần tự hóa siêu dữ liệu và announce.",
-                "SQLite Documentation, *Write-Ahead Logging*. — Chế độ WAL cho truy cập đồng thời.",
-                "OpenSSL Documentation, *EVP Message Digests*. — API băm SHA-256 theo luồng.",
-                "GoogleTest Documentation. — Khung kiểm thử đơn vị và tích hợp.",
-                "Docker Documentation, *Multi-stage builds* và *Compose file reference*. — Đóng gói và triển khai.",
-                "A. S. Tanenbaum, M. van Steen, *Distributed Systems*, 4th edition. — Nhất quán, chịu lỗi, mô hình lỗi.",
-                "M. Kleppmann, *Designing Data-Intensive Applications*, O'Reilly, 2017. — Đồng thời, nhất quán, "
-                "idempotency và retry.",
-            ]
-        ),
-        rich(
-            "Toàn bộ thư viện bên thứ ba được dùng đúng như giấy phép của nó (Crow: BSD-3, nlohmann/json: MIT, "
-            "GoogleTest: BSD-3, SQLite: public domain, OpenSSL: Apache-2.0). Phần lõi phân tán — tracker, registry, "
-            "giao thức, chọn mảnh, retry, phục hồi — do nhóm tự viết."
-        ),
+    return [h1("18. Tài liệu tham khảo"),
+        rich("[1] Học phần Hệ thống phân tán, *COURSE PROJECT SPECIFICATION*, bản PDF cung cấp trong kho; trọng tâm §4, §6 (DS02), §9–13. Nguồn xác định yêu cầu, không suy diễn thêm yêu cầu WAN của DS01 sang DS02."),
+        rich("[2] Kho mã nguồn nhóm: https://github.com/huynhhoang04/qbittorrent-clone — tham chiếu mã nguồn hoàn thiện tại 72a5d0c, README.md, src/, tests/, scripts/, deploy/; hiện vật kết quả: docs/bench/results.csv và docs/evidence/ và log CTest ngày 22/11/2026. Các thay đổi working tree sau mốc này cần kiểm tra lại."),
+        rich("[3] Bram Cohen, *The BitTorrent Protocol Specification*, BEP 3. https://www.bittorrent.org/beps/bep_0003.html — tham khảo mô hình tracker, metainfo và trao đổi mảnh; giao thức của đồ án có các khác biệt ở §8.1. Truy cập 22/11/2026."),
+        rich("[4] SQLite, *Write-Ahead Logging*. https://sqlite.org/wal.html — tham khảo mô hình readers/writer và phạm vi WAL cục bộ. Truy cập 22/11/2026."),
+        rich("[5] OpenSSL, *EVP_DigestInit / EVP_DigestUpdate / EVP_DigestFinal*. https://docs.openssl.org/3.0/man3/EVP_DigestInit/ — API digest được dùng qua lớp SHA256 của đồ án. Truy cập 22/11/2026."),
+        rich("[6] Thư viện được tích hợp trong mã: Crow (HTTP), nlohmann/json (JSON), GoogleTest (test), SQLite, OpenSSL và ncurses (TUI). Đối chiếu include/CMake và giấy phép đúng phiên bản khi đóng gói bản nộp. Không coi việc sử dụng thư viện là bằng chứng nhóm đã tự viết lại các thư viện đó."),
+        rich("Các hình kiến trúc và trình tự trong báo cáo là sơ đồ mô tả hiện thực của nhóm. Lõi điều phối peer, registry, scheduler, retry và lưu trạng thái thể hiện trong mã nguồn của kho; không sử dụng qBittorrent hoàn chỉnh rồi chỉ thay giao diện. Theo §13 [1], nhóm phải tự kiểm chứng, hiểu và chịu trách nhiệm về mọi nội dung có hỗ trợ từ công cụ AI."),
     ]
 
 
+
 def section_19_appendix():
-    return [
-        h1("19. Phụ lục"),
-        h2("19.1. Lệnh tái lập toàn bộ kết quả"),
-        code(
-            """# Build bản Release (đo hiệu năng) và bản Debug (ASan, chạy test)
-cmake -S . -B build         -DCMAKE_BUILD_TYPE=Debug
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build build         -j"$(nproc)"
-cmake --build build-release -j"$(nproc)"
+    import json
+    from pathlib import Path
+    folder=EVIDENCE
+    results=json.loads((folder/'test-summary.json').read_text())
+    return [PageBreak(),h1("19. Phụ lục"),
+        h2("19.1. Lệnh tái kiểm chứng trước khi nộp"),
+        code("""# Chạy sau khi chốt code; giữ log gắn với commit cuối.
+mkdir -p docs/evidence
+ctest --test-dir build --output-on-failure > docs/evidence/ctest.txt 2>&1
+# Kiểm tra exit code, số PASS/FAIL/SKIP trong log.
+QBT_BUILD_DIR="$PWD/build-release" ./scripts/demo_full.sh \\
+  > docs/evidence/demo-full.txt 2>&1
+QBT_BUILD_DIR="$PWD/build-release" BENCH_CSV=docs/bench/results.csv \\
+  ./scripts/bench.sh > docs/evidence/bench.txt 2>&1
+# Giữ thêm git rev-parse HEAD, môi trường và lệnh đã dùng."""),
+        rich("Các lệnh trên mô tả cách tái lập quá trình đánh giá. Khi thu log qua pipeline trong Bash cần bật pipefail để giữ trạng thái thất bại của lệnh kiểm thử."),
+        h2("19.2. Tóm tắt phiên CTest đã lưu"),
+        rich('Nguồn: docs/evidence/ctest-release.log; đối chiếu thêm docs/evidence/ctest-debug.log. Cả hai lần chạy có 48 mục: 47 PASS và 1 SKIP. Danh sách bên dưới được trích từ log Release; metadata và hash các hiện vật được lưu tại docs/evidence/validation.json.'),
+        table(["#", "Tên test (suite.case)", "Kết quả"],[(str(i+1),n,status) for i,(n,status) in enumerate(results)], widths=[.06,.81,.13]),
+        caption("Bảng 19.1 — 48 mục trong log; 47 PASS và 1 SKIP, không có FAIL trong phiên đánh giá cuối."),
+        h2("19.3. Dữ liệu thô hiệu năng"),
+        code((ROOT/'docs/bench/results.csv').read_text().strip()),
+        rich("CSV được chụp lại từ hiện vật có sẵn để tính các bảng mục 15. 'verified=yes' là trường kết quả của script; contributors '-' là chưa đo, RSS 0 ở dòng đồng thời là thiếu mẫu, không phải tiến trình không dùng RAM."),
+        h2("19.4. Tham số vận hành quan trọng"),
+        table(["CLI", "Mặc định / ý nghĩa"], [
+            ("--tracker", "TRACKER_URL hoặc http://localhost:8080; demo nhiều máy phải thay bằng IP tracker"),
+            ("-p / --port", "Peer 6881; tracker 8080; 0 để OS cấp cổng nếu đường chạy hỗ trợ"),
+            ("--data-dir / --output-dir", "DB/trạng thái riêng và nơi đặt tệp; giữ nguyên cả hai để resume"),
+            ("--announce-ip", "IP/hostname mà các peer khác kết nối được; có thể dùng PEER_HOST"),
+            ("--chunk-size", "262144 byte khi tạo metadata; dùng chung metadata cho mọi peer trong demo"),
+            ("--max-downloads / --max-uploads", "Mặc định 5/5; giới hạn nguồn/slot, không phải rate limit"),
+            ("--pipeline-depth / --io-timeout-ms", "Mặc định 3 / 4000; timeout quá ngắn dễ loại nhầm nguồn bận"),
+            ("--chunk-delay-ms / --corrupt-chunks", "Mặc định 0 / rỗng; chỉ thêm delay/hỏng mảnh trong test/demo"),
+            ("--webui / --webui-port", "Dashboard tắt mặc định; cổng mặc định 8081"),
+            ("--exit-after-download", "Thoát sau tải: không dùng cho peer cần tiếp tục làm nguồn demo"),
+        ], widths=[.34,.66]),
+        caption("Bảng 19.2 — Tham số lấy từ CLI; chạy --help trên binary chốt để xác nhận."),
 
-# Toàn bộ 42 bài kiểm thử
-ctest --test-dir build --output-on-failure
-
-# Bảy kịch bản demo bắt buộc (bản Debug hoặc Release đều được)
-./scripts/demo_full.sh
-
-# Thí nghiệm hiệu năng (đọc QBT_BUILD_DIR, mặc định build-release)
-BENCH_CSV=docs/bench/results.csv ./scripts/bench.sh"""
-        ),
-        h2("19.2. Tham số cấu hình"),
-        table(
-            ["Tham số", "Mặc định", "Ý nghĩa"],
-            [
-                ("`--port` / `-p`", "6881 (peer), 8080 (tracker)", "Cổng lắng nghe; `0` để OS cấp"),
-                ("`--tracker`", "`$TRACKER_URL` hoặc `http://localhost:8080`", "URL tracker"),
-                ("`--chunk-size`", "262144 (256 KB)", "Kích thước mảnh khi seed/tải"),
-                ("`--max-downloads`", "5", "Số nguồn tải song song tối đa"),
-                ("`--max-uploads`", "5", "Số slot phục vụ tối đa"),
-                ("`--pipeline-depth`", "3", "Số REQUEST chưa trả lời mỗi kết nối"),
-                ("`--io-timeout-ms`", "4000", "Timeout socket (ms)"),
-                ("`--chunk-delay-ms`", "0", "Độ trễ nhân tạo mỗi mảnh — dùng cho demo và benchmark"),
-                ("`--corrupt-chunks`", "rỗng", "Danh sách chỉ số mảnh cố tình hỏng — dùng cho kịch bản 5"),
-                ("`--announce-ip`", "tự dò / `$PEER_HOST`", "Địa chỉ công bố với tracker"),
-                ("`--webui` / `--webui-port`", "tắt / 8081", "Bật dashboard HTTP"),
-                ("`--exit-after-download`", "tắt", "Thoát ngay khi tải xong — dùng cho script"),
-            ],
-            widths=[0.26, 0.30, 0.44],
-        ),
-        caption("Bảng 19.1 — Các tham số dòng lệnh chính của PeerApp."),
-        spacer(2),
-        h2("19.3. Số liệu thô của thí nghiệm hiệu năng"),
-        rich(
-            "Số liệu thô nằm trong `docs/bench/results.csv` và được sinh trực tiếp bởi `scripts/bench.sh`; mọi bảng ở "
-            "mục 15 đều đọc từ tệp này, không nhập tay. In lại nguyên văn để người đọc có thể đối chiếu:"
-        ),
-        code(
-            """dimension,configuration,bytes,elapsed_ms,contributors,peak_rss_kb,verified
-sources,1-source,104857600,20531,1,12460,yes
-sources,2-source,104857600,10537,2,13192,yes
-sources,3-source,104857600,7054,3,14172,yes
-filesize,10MB,10485760,2514,1,12104,yes
-filesize,50MB,52428800,10548,1,12236,yes
-filesize,100MB,104857600,20548,1,12292,yes
-concurrency,1-leecher/1-slot,20971520,4546,-,0,yes
-concurrency,4-leecher/1-slot,83886080,4556,-,0,yes
-concurrency,8-leecher/1-slot,167772160,5043,-,0,yes
-concurrency,1-leecher/8-slot,20971520,4553,-,0,yes
-concurrency,4-leecher/8-slot,83886080,2549,-,0,yes
-concurrency,8-leecher/8-slot,167772160,2044,-,0,yes"""
-        ),
-        rich(
-            "Cột `bytes` là tổng dữ liệu cả swarm nhận được ở phần đồng thời (kích thước tệp × số leecher), nên cột "
-            "thông lượng ở mục 15.4 là **tổng hợp**, không phải của từng leecher. `peak_rss_kb = 0` nghĩa là phép đo "
-            "theo dõi tiến trình đó không lấy được mẫu (tiến trình con của script), và các bảng tương ứng hiển thị "
-            "`-` thay vì bịa một con số."
-        ),
-        h2("19.4. Lịch sử phát triển"),
-        table(
-            ["Mốc", "Nội dung chính đã hoàn tất"],
-            [
-                ("M0–M2", "Khung CMake ba thư viện; SHA-256, metadata, wire protocol, SQLite CRUD + unit test"),
-                ("M3", "Tracker HTTP (3 endpoint), peer registry thread-safe, tracker client, dọn peer quá hạn"),
-                ("M4", "Upload server đa luồng, download manager với retry, state manager + SQLite, CLI"),
-                ("M5", "Tải song song đa nguồn, rarest-first, choke/unchoke và giới hạn slot, 9 bài concurrency"),
-                ("M6", "7 kịch bản demo tự động, TUI ncurses, blacklist theo mảnh, 10 bài dữ liệu sai"),
-                ("M7", "Docker hóa, ASan + profiling, Web dashboard, CI Linux + Windows, báo cáo và slide"),
-            ],
-            widths=[0.12, 0.88],
-        ),
-        caption("Bảng 19.2 — Các cột mốc đã hoàn tất, đối chiếu với lịch sử commit và Issue trên GitHub."),
+        h2("19.5. Hiện vật bàn giao"),
+        table(["Hạng mục", "Hiện trạng / việc cần xác nhận"], [
+            ("README, src, tests, scripts, deploy, .env.example", "Có trong kho; cần xác nhận hướng dẫn chạy trên môi trường sạch"),
+            ("docs/report.pdf", "Báo cáo này: thông tin 3 thành viên, 19 mục và kết quả có nguồn"),
+            ("docs/slides.pdf", "Chưa thấy trong snapshot; đề bài cho phép slides nếu có"),
+            ("Commit của từng thành viên", "Có lịch sử đối chiếu ở mục 2; mỗi người mở đúng phần việc khi vấn đáp"),
+            ("Final tag/release và quyền truy cập", "Nhóm kiểm tra trên commit cuối và cấp quyền giảng viên nếu repo private; không suy ra từ số phiên bản CMake"),
+            ("Demo trực tiếp", "≥3 peer + tracker; mạng; đồng thời; lỗi live; log; cả ba thành viên tham gia"),
+        ], widths=[.34,.66]),
+        caption("Bảng 19.3 — Các hiện vật nộp bài và xác nhận vận hành cần có."),
     ]

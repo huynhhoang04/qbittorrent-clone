@@ -40,6 +40,7 @@ def main():
     styles = report_lib.Styles()
 
     doc = report_lib.ReportDoc(out_path, content_a.TITLE_RUNNING)
+    doc.author = "Nhóm 11 — Hoàng Văn Huynh; Nguyễn Gia Bách; Nguyễn Hữu Trường"
     # The cover/TOC helpers expect styles attached to the doc, so the content
     # modules can stay free of layout code.
     doc.styles_cover_title = styles.cover_title
@@ -96,7 +97,11 @@ def main():
             and isinstance(flat[index + 1], Paragraph)
             and flat[index + 1].style.name == "Caption"
         ):
-            glued.append(KeepTogether([item, flat[index + 1]]))
+            if glued and isinstance(glued[-1], Paragraph) and glued[-1].style.name in ("H1", "H2", "H3"):
+                heading = glued.pop()
+                glued.append(KeepTogether([heading, item, flat[index + 1]]))
+            else:
+                glued.append(KeepTogether([item, flat[index + 1]]))
             index += 2
             continue
         glued.append(item)
@@ -109,7 +114,9 @@ def main():
     # multiBuild replays the story and polls the TOC between passes, so the
     # flowable list it keeps must survive being walked more than once; plain
     # lists are fine here because nothing mutates them in place.
-    doc.multiBuild(flat)
+    from functools import partial
+    from reportlab.pdfgen.canvas import Canvas
+    doc.multiBuild(flat, canvasmaker=partial(Canvas, initialFontName=report_lib.SANS))
     print("wrote %s" % out_path)
 
 

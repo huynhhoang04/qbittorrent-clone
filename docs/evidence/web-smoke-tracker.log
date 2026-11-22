@@ -1,0 +1,15 @@
+[34m[2026-11-22 09:31:09.607] [INFO] Starting TrackerApp on port 48165[0m
+[34m[2026-11-22 09:31:09.607] [INFO] Tracker server starting on port 48165[0m
+[32m[2026-11-22 09:31:09.716] [SUCCESS] Added peer peer-0-00b5345fee2e447a for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.716] [INFO] Announce success from peer-0-00b5345fee2e447a (127.0.0.1:44961) for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.720] [INFO] Found 1 peers for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.720] [INFO] Query peers for 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323: found 1[0m
+[32m[2026-11-22 09:31:09.723] [SUCCESS] Added peer peer-0-e5cfc4643f91aec4 for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.723] [INFO] Announce success from peer-0-e5cfc4643f91aec4 (127.0.0.1:43293) for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.724] [INFO] Found 2 peers for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.724] [INFO] Query peers for 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323: found 2[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Updated peer peer-0-e5cfc4643f91aec4 for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[34m[2026-11-22 09:31:09.725] [INFO] Announce success from peer-0-e5cfc4643f91aec4 (127.0.0.1:43293) for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323[0m
+[32m[2026-11-22 09:31:17.226] [SUCCESS] TrackerApp exited cleanly[0m
+[34m[2026-11-22 09:31:17.226] [INFO] Stopping tracker server...[0m
+[32m[2026-11-22 09:31:17.226] [SUCCESS] Tracker server stopped[0m

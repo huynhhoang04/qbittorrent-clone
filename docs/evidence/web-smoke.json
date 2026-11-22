@@ -1,0 +1,80 @@
+{
+  "checks": [
+    {
+      "check": "tracker CLI overrides .env port",
+      "result": "PASS",
+      "details": ""
+    },
+    {
+      "check": "peer reads .env URL, auto port, data dir and web port",
+      "result": "PASS",
+      "details": ""
+    },
+    {
+      "check": "valid browser upload can seed a file",
+      "result": "PASS",
+      "details": "200"
+    },
+    {
+      "check": "reject unsafe upload filename '../escape.bin'",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject unsafe upload filename 'bad\\\\escape.bin'",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject unsafe upload filename '/tmp/escape.bin'",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject unsafe upload filename '..'",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject unsafe upload filename ''",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject escaped path at /api/seed",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject escaped path at /api/download",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "reject escaped path at /api/upload_torrent",
+      "result": "PASS",
+      "details": "400"
+    },
+    {
+      "check": "upload has trusted metadata and peer registration",
+      "result": "PASS",
+      "details": ""
+    },
+    {
+      "check": "tracker discovers seeded peer",
+      "result": "PASS",
+      "details": ""
+    },
+    {
+      "check": "metadata filename is sanitized and download remains correct",
+      "result": "PASS",
+      "details": "0"
+    },
+    {
+      "check": "web service remains usable after invalid requests",
+      "result": "PASS",
+      "details": ""
+    }
+  ],
+  "all_passed": true
+}

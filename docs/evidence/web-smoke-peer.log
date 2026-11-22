@@ -1,0 +1,53 @@
+[34m[2026-11-22 09:31:09.616] [INFO] Loaded state for 0 torrent(s) from database[0m
+[34m[2026-11-22 09:31:09.616] [INFO] Starting PeerNode [peer-0-00b5345fee2e447a] on port 0[0m
+[34m[2026-11-22 09:31:09.616] [INFO] UploadServer listening on port 44961[0m
+[32m[2026-11-22 09:31:09.616] [SUCCESS] Tracker is healthy[0m
+[32m[2026-11-22 09:31:09.616] [SUCCESS] PeerNode is up and running on port 44961[0m
+(2026-11-22 02:31:09) [INFO    ] Crow/master server is running at http://0.0.0.0:36001 using 8 threads
+(2026-11-22 02:31:09) [INFO    ] Call `app.loglevel(crow::LogLevel::Warning)` to hide Info level logs.
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38128 0x7f699c0043c0 HTTP/1.1 GET /api/status
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f699c0043c0 /api/status 200 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38144 0x7f697c000bd0 HTTP/1.1 POST /api/upload_seed
+[2026-11-22 09:31:09.715] [INFO] Generating metadata for file /tmp/qbt-web-validation-bs9f02o3/state/shared/safe.bin
+[2026-11-22 09:31:09.715] [INFO] Start hashsing file :/tmp/qbt-web-validation-bs9f02o3/state/shared/safe.bin
+[2026-11-22 09:31:09.716] [SUCCESS] Success
+[2026-11-22 09:31:09.716] [SUCCESS] Success
+[2026-11-22 09:31:09.716] [SUCCESS] Suceess create torrent file at : /tmp/qbt-web-validation-bs9f02o3/state/shared/safe.bin.torrent.json
+[2026-11-22 09:31:09.716] [SUCCESS] Return torrrent info now
+[2026-11-22 09:31:09.716] [INFO] Initialized state for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323 (1 chunks)
+[2026-11-22 09:31:09.716] [SUCCESS] Web UI Dashboard running at http://localhost:36001
+[2026-11-22 09:31:09.716] [INFO] Marked all chunks verified for file 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323
+[2026-11-22 09:31:09.716] [SUCCESS] Announce to Tracker succeeded
+[2026-11-22 09:31:09.716] [SUCCESS] Seeding file: safe.bin (File ID: 6e1907bc837f468dab116b5a200128d5828b2a2e5c91df590994e479be9e4323)
+[2026-11-22 09:31:09.716] [SUCCESS] WebUI: successfully uploaded and seeded safe.bin
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c000bd0 /api/upload_seed?filename=safe.bin 200 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38150 0x7f697c002210 HTTP/1.1 POST /api/upload_seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c002210 /api/upload_seed?filename=..%2Fescape.bin 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38154 0x7f697c000bd0 HTTP/1.1 POST /api/upload_seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c000bd0 /api/upload_seed?filename=bad%5Cescape.bin 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38160 0x7f697c002210 HTTP/1.1 POST /api/upload_seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c002210 /api/upload_seed?filename=%2Ftmp%2Fescape.bin 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38176 0x7f697c000bd0 HTTP/1.1 POST /api/upload_seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c000bd0 /api/upload_seed?filename=.. 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38186 0x7f697c002210 HTTP/1.1 POST /api/upload_seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c002210 /api/upload_seed?filename= 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38190 0x7f697c000bd0 HTTP/1.1 POST /api/seed
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c000bd0 /api/seed 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38206 0x7f697c002210 HTTP/1.1 POST /api/download
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c002210 /api/download 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38212 0x7f697c000bd0 HTTP/1.1 POST /api/upload_torrent
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c000bd0 /api/upload_torrent 400 1
+(2026-11-22 02:31:09) [INFO    ] Request: 127.0.0.1:38216 0x7f697c002210 HTTP/1.1 GET /api/status
+(2026-11-22 02:31:09) [INFO    ] Response: 0x7f697c002210 /api/status 200 1
+(2026-11-22 02:31:10) [INFO    ] Request: 127.0.0.1:38222 0x7f697c000bd0 HTTP/1.1 GET /api/status
+(2026-11-22 02:31:10) [INFO    ] Response: 0x7f697c000bd0 /api/status 200 1
+(2026-11-22 02:31:10) [INFO    ] Closing acceptor. 0x7f699c001260
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c40
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c48
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c50
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c58
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c60
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c68
+(2026-11-22 02:31:10) [INFO    ] Closing IO service 0x7f699c002c70
+(2026-11-22 02:31:10) [INFO    ] Closing main IO service (0x7f699c001218)
+(2026-11-22 02:31:10) [INFO    ] Exiting.

@@ -1,0 +1,20 @@
+M6 demo run
+  repo:    /mnt/Data/ptit/qbittorrent-clone
+  build:   /mnt/Data/ptit/qbittorrent-clone/build-release
+  workdir: /tmp/qbt_demo_OMvxrT
+  tracker: http://127.0.0.1:23571
+
+scripts/demo_full.sh: line 175: 232553 Killed                     ( exec "$peer_bin" "$@" ) > "$log" 2>&1
+scripts/demo_full.sh: line 1: 232606 Killed                     ( exec "$peer_bin" "$@" ) > "$log" 2>&1
+scripts/demo_full.sh: line 444: 233037 Killed                     ( exec "$peer_bin" "$@" ) > "$log" 2>&1
+
+================= demo results =================
+DEMO 1  Tracker registration and discovery      PASS: /peers returned 2 peers for file_id 5567dc2b077c9831cf282abb207c9749a62db57e843493ddb0f724757e57c6d6
+DEMO 2  Single-source download with SHA-256     PASS: sha256 5dd30584e12564be81338a35a670a72aea236432deb4cc25867d164a10cb2f90 matches source
+DEMO 3  Multi-source download                   PASS: 2 peers contributed chunks and sha256 matches
+DEMO 4  Seeder failure with failover            PASS: killed pid 232718 mid-transfer, remaining chunks came from the survivor, sha256 matches
+DEMO 5  Corrupted chunk detection               PASS: 25 corrupted chunk(s) detected and re-fetched, sha256 matches
+DEMO 6  Crash resume from persisted state       PASS: killed at 10/129 verified chunk(s), restart re-fetched only 111 of 129, sha256 matches
+DEMO 7  Tracker expiry after 45s                PASS: stale peer dropped from /peers after 51s (45s threshold, 10s sweep)
+================================================
+ALL 7 DEMOS PASS

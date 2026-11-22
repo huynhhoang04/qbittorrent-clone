@@ -1,0 +1,104 @@
+Test project /mnt/Data/ptit/qbittorrent-clone/build
+      Start  1: SHA256Test.HashBuffer
+ 1/48 Test  #1: SHA256Test.HashBuffer .....................................................   Passed    0.03 sec
+      Start  2: SHA256Test.HashEmpty
+ 2/48 Test  #2: SHA256Test.HashEmpty ......................................................   Passed    0.03 sec
+      Start  3: MetadataTest.GenerateAndLoad
+ 3/48 Test  #3: MetadataTest.GenerateAndLoad ..............................................   Passed    0.03 sec
+      Start  4: FileManagerTest.CreateWriteRead
+ 4/48 Test  #4: FileManagerTest.CreateWriteRead ...........................................   Passed    0.03 sec
+      Start  5: ProtocolTest.SerializeDeserializeKeepAlive
+ 5/48 Test  #5: ProtocolTest.SerializeDeserializeKeepAlive ................................   Passed    0.03 sec
+      Start  6: ProtocolTest.SerializeDeserializeRequest
+ 6/48 Test  #6: ProtocolTest.SerializeDeserializeRequest ..................................   Passed    0.03 sec
+      Start  7: ProtocolTest.DeserializeIncompleteData
+ 7/48 Test  #7: ProtocolTest.DeserializeIncompleteData ....................................   Passed    0.03 sec
+      Start  8: ProtocolTest.JSONSerializeDeserialize
+ 8/48 Test  #8: ProtocolTest.JSONSerializeDeserialize .....................................   Passed    0.03 sec
+      Start  9: NetTest.ResolveIPv4NumericAndHostnames
+ 9/48 Test  #9: NetTest.ResolveIPv4NumericAndHostnames ....................................   Passed    0.03 sec
+      Start 10: NetTest.DetectOutboundIP
+10/48 Test #10: NetTest.DetectOutboundIP ..................................................   Passed    0.03 sec
+      Start 11: DatabaseTest.InsertAndGetTorrent
+11/48 Test #11: DatabaseTest.InsertAndGetTorrent ..........................................   Passed    0.03 sec
+      Start 12: DatabaseTest.ChunkOperations
+12/48 Test #12: DatabaseTest.ChunkOperations ..............................................   Passed    0.03 sec
+      Start 13: DatabaseTest.PeerHistoryOps
+13/48 Test #13: DatabaseTest.PeerHistoryOps ...............................................   Passed    0.03 sec
+      Start 14: PeerRegistryTest.AddAndQuery
+14/48 Test #14: PeerRegistryTest.AddAndQuery ..............................................   Passed    0.03 sec
+      Start 15: PeerRegistryTest.UpdateLastSeen
+15/48 Test #15: PeerRegistryTest.UpdateLastSeen ...........................................   Passed    0.03 sec
+      Start 16: PeerRegistryTest.TimeoutCleanup
+16/48 Test #16: PeerRegistryTest.TimeoutCleanup ...........................................   Passed    0.03 sec
+      Start 17: PeerRegistryTest.MultiFileSwarm
+17/48 Test #17: PeerRegistryTest.MultiFileSwarm ...........................................   Passed    0.03 sec
+      Start 18: PeerRegistryTest.ConcurrencyThreadSafety
+18/48 Test #18: PeerRegistryTest.ConcurrencyThreadSafety ..................................   Passed    0.13 sec
+      Start 19: TrackerServerIntegrationTest.EndToEndFlow
+19/48 Test #19: TrackerServerIntegrationTest.EndToEndFlow .................................   Passed    0.23 sec
+      Start 20: StateManagerTest.InitAndProgress
+20/48 Test #20: StateManagerTest.InitAndProgress ..........................................   Passed    0.73 sec
+      Start 21: ConcurrentDownloadTest.OneSeederTwoLeechersConcurrent
+21/48 Test #21: ConcurrentDownloadTest.OneSeederTwoLeechersConcurrent .....................   Passed    0.18 sec
+      Start 22: ConcurrentDownloadTest.LeecherServesAnotherLeecher
+22/48 Test #22: ConcurrentDownloadTest.LeecherServesAnotherLeecher ........................   Passed    0.13 sec
+      Start 23: ConcurrentDownloadTest.TwoSeedersOneLeecher
+23/48 Test #23: ConcurrentDownloadTest.TwoSeedersOneLeecher ...............................   Passed    0.16 sec
+      Start 24: ConcurrentDownloadTest.UploadSlotsRespectLimitUnderConnectionSaturation
+24/48 Test #24: ConcurrentDownloadTest.UploadSlotsRespectLimitUnderConnectionSaturation ...   Passed    0.17 sec
+      Start 25: ConcurrentDownloadTest.PartialPeersServeEachOtherWhileDownloading
+25/48 Test #25: ConcurrentDownloadTest.PartialPeersServeEachOtherWhileDownloading .........   Passed    0.16 sec
+      Start 26: ConcurrentDownloadTest.PeerNodesOnSameRequestedPortExchange
+26/48 Test #26: ConcurrentDownloadTest.PeerNodesOnSameRequestedPortExchange ...............   Passed    1.09 sec
+      Start 27: ConcurrentDownloadTest.CorruptedChunksAreDetectedRequeuedAndRefetched
+27/48 Test #27: ConcurrentDownloadTest.CorruptedChunksAreDetectedRequeuedAndRefetched .....   Passed    0.15 sec
+      Start 28: ConcurrentDownloadTest.PeerRegisteringAfterStartIsAdoptedPromptly
+28/48 Test #28: ConcurrentDownloadTest.PeerRegisteringAfterStartIsAdoptedPromptly .........   Passed    1.41 sec
+      Start 29: ConcurrentDownloadTest.RepeatedSwarmStressWithoutDeadlock
+29/48 Test #29: ConcurrentDownloadTest.RepeatedSwarmStressWithoutDeadlock .................   Passed    0.18 sec
+      Start 30: InvalidDataTest.DeserializeRejectsOversizedLengthBeforeAllocating
+30/48 Test #30: InvalidDataTest.DeserializeRejectsOversizedLengthBeforeAllocating .........   Passed    0.03 sec
+      Start 31: InvalidDataTest.DeserializeRejectsTruncatedAndShortFrames
+31/48 Test #31: InvalidDataTest.DeserializeRejectsTruncatedAndShortFrames .................   Passed    0.03 sec
+      Start 32: InvalidDataTest.DeserializeHandlesKeepAliveAndBounds
+32/48 Test #32: InvalidDataTest.DeserializeHandlesKeepAliveAndBounds ......................   Passed    0.03 sec
+      Start 33: InvalidDataTest.HandshakeDecodeRejectsMalformedPayloads
+33/48 Test #33: InvalidDataTest.HandshakeDecodeRejectsMalformedPayloads ...................   Passed    0.03 sec
+      Start 34: InvalidDataTest.HandshakeFieldsOverTheLimitAreRefused
+34/48 Test #34: InvalidDataTest.HandshakeFieldsOverTheLimitAreRefused .....................   Passed    0.03 sec
+      Start 35: InvalidDataTest.SendingAnOversizedMessageIsRefusedWithoutWriting
+35/48 Test #35: InvalidDataTest.SendingAnOversizedMessageIsRefusedWithoutWriting ..........   Passed    0.03 sec
+      Start 36: InvalidDataTest.ReceiverRejectsOversizedFrameAndDoesNotHang
+36/48 Test #36: InvalidDataTest.ReceiverRejectsOversizedFrameAndDoesNotHang ...............   Passed    0.03 sec
+      Start 37: InvalidDataTest.ReceiverHandlesTruncatedBodyWithoutHang
+37/48 Test #37: InvalidDataTest.ReceiverHandlesTruncatedBodyWithoutHang ...................   Passed    0.03 sec
+      Start 38: InvalidDataTest.UploadServerRefusesNonHandshakeTrafficAndStaysUsable
+38/48 Test #38: InvalidDataTest.UploadServerRefusesNonHandshakeTrafficAndStaysUsable ......   Passed    0.03 sec
+      Start 39: InvalidDataTest.OutOfRangeChunkRequestClosesConnectionWithoutSlotLeak
+39/48 Test #39: InvalidDataTest.OutOfRangeChunkRequestClosesConnectionWithoutSlotLeak .....   Passed    0.03 sec
+      Start 40: FaultRecoveryTest.SeederDeathMidDownloadFailsOverToSecondSeeder
+40/48 Test #40: FaultRecoveryTest.SeederDeathMidDownloadFailsOverToSecondSeeder ...........   Passed    0.22 sec
+      Start 41: FaultRecoveryTest.CorruptedOnlySourceIsRejectedAndDownloadFails
+41/48 Test #41: FaultRecoveryTest.CorruptedOnlySourceIsRejectedAndDownloadFails ...........   Passed    2.35 sec
+      Start 42: FaultRecoveryTest.RealProcessCrashResumesFromPersistedSqliteState
+42/48 Test #42: FaultRecoveryTest.RealProcessCrashResumesFromPersistedSqliteState .........***Skipped   0.03 sec
+      Start 43: EnvTest.ParsesPlainKeyValueLines
+43/48 Test #43: EnvTest.ParsesPlainKeyValueLines ..........................................   Passed    0.03 sec
+      Start 44: EnvTest.IgnoresCommentsBlankLinesAndMalformedEntries
+44/48 Test #44: EnvTest.IgnoresCommentsBlankLinesAndMalformedEntries ......................   Passed    0.03 sec
+      Start 45: EnvTest.RealEnvironmentBeatsTheFile
+45/48 Test #45: EnvTest.RealEnvironmentBeatsTheFile .......................................   Passed    0.03 sec
+      Start 46: EnvTest.MissingFileIsNotAnError
+46/48 Test #46: EnvTest.MissingFileIsNotAnError ...........................................   Passed    0.03 sec
+      Start 47: EnvTest.IntegerReaderFallsBackAndClamps
+47/48 Test #47: EnvTest.IntegerReaderFallsBackAndClamps ...................................   Passed    0.03 sec
+      Start 48: EnvTest.EmptyStringFallsBack
+48/48 Test #48: EnvTest.EmptyStringFallsBack ..............................................   Passed    0.03 sec
+
+100% tests passed out of 48
+
+Total Test time (real) =   8.39 sec
+
+The following tests did not run:
+	 42 - FaultRecoveryTest.RealProcessCrashResumesFromPersistedSqliteState (Skipped)

@@ -21,11 +21,10 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.tableofcontents import TableOfContents
 
-FONT_DIR = "/usr/share/fonts/TTF"
-SANS = "DejaVu"
-SANS_BOLD = "DejaVu-Bold"
-SANS_ITALIC = "DejaVu-Oblique"
-MONO = "DejaVuMono"
+SANS = "TimesNewRoman"
+SANS_BOLD = "TimesNewRoman-Bold"
+SANS_ITALIC = "TimesNewRoman-Italic"
+MONO = SANS
 
 ACCENT = colors.HexColor("#1f3864")
 ACCENT_LIGHT = colors.HexColor("#dbe5f1")
@@ -34,22 +33,56 @@ RULE = colors.HexColor("#b7c4d6")
 
 
 def register_fonts():
-    pdfmetrics.registerFont(TTFont(SANS, os.path.join(FONT_DIR, "DejaVuSans.ttf")))
-    pdfmetrics.registerFont(
-        TTFont(SANS_BOLD, os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf"))
+    """Embed actual Times New Roman; never silently substitute another family."""
+    from pathlib import Path
+    import subprocess
+
+    configured = os.environ.get("QBT_REPORT_FONT_DIR")
+    directories = [Path(configured)] if configured else []
+    if not configured:
+        try:
+            matched = subprocess.check_output(
+                ["fc-match", "-f", "%{file}", "Times New Roman"],
+                text=True, stderr=subprocess.DEVNULL,
+            ).strip()
+            if matched:
+                directories.append(Path(matched).parent)
+        except (OSError, subprocess.CalledProcessError):
+            pass
+        directories += [
+            Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts",
+            Path("/usr/share/fonts/truetype/msttcorefonts"),
+            Path("/usr/share/fonts/TTF"),
+            Path.home() / ".local/share/fonts",
+        ]
+    variants = [
+        (SANS, "times.ttf"),
+        (SANS_BOLD, "timesbd.ttf"),
+        (SANS_ITALIC, "timesi.ttf"),
+        ("TimesNewRoman-BoldItalic", "timesbi.ttf"),
+    ]
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        files = {p.name.lower(): p for p in directory.rglob("*") if p.is_file()}
+        if all(file in files for _, file in variants):
+            for family, file in variants:
+                font = TTFont(family, str(files[file]))
+                if not font.face.name.startswith(b"TimesNewRoman"):
+                    raise RuntimeError("The report requires actual Times New Roman fonts")
+                pdfmetrics.registerFont(font)
+            pdfmetrics.registerFontFamily(
+                SANS, normal=SANS, bold=SANS_BOLD,
+                italic=SANS_ITALIC, boldItalic="TimesNewRoman-BoldItalic",
+            )
+            return
+    raise FileNotFoundError(
+        "Times New Roman was not found. Install the family or set QBT_REPORT_FONT_DIR "
+        "to the directory containing times.ttf, timesbd.ttf, timesi.ttf, timesbi.ttf. "
+        "See scripts/report/README.md."
     )
-    pdfmetrics.registerFont(
-        TTFont(SANS_ITALIC, os.path.join(FONT_DIR, "DejaVuSans-Oblique.ttf"))
-    )
-    # DejaVuSansMono lacks several Vietnamese diacritic glyphs (ả, ế, ấ …), and
-    # a missing glyph renders as a blank box in the middle of a word. Liberation
-    # Mono is metric-compatible with Arial and covers the full Vietnamese range.
-    pdfmetrics.registerFont(
-        TTFont(MONO, "/usr/share/fonts/liberation/LiberationMono-Regular.ttf")
-    )
-    pdfmetrics.registerFontFamily(
-        SANS, normal=SANS, bold=SANS_BOLD, italic=SANS_ITALIC, boldItalic=SANS_BOLD
-    )
+
+
 
 
 class Styles:
@@ -59,8 +92,10 @@ class Styles:
         self.body = ParagraphStyle(
             "Body",
             fontName=SANS,
-            fontSize=10,
-            leading=15,
+            bulletFontName=SANS,
+            bulletFontSize=12,
+            fontSize=12,
+            leading=17,
             alignment=TA_JUSTIFY,
             spaceAfter=5,
         )
@@ -68,8 +103,8 @@ class Styles:
         self.h1 = ParagraphStyle(
             "H1",
             fontName=SANS_BOLD,
-            fontSize=15,
-            leading=20,
+            fontSize=16,
+            leading=21,
             textColor=ACCENT,
             spaceBefore=16,
             spaceAfter=8,
@@ -78,8 +113,8 @@ class Styles:
         self.h2 = ParagraphStyle(
             "H2",
             fontName=SANS_BOLD,
-            fontSize=11.5,
-            leading=16,
+            fontSize=13.5,
+            leading=18,
             textColor=ACCENT,
             spaceBefore=11,
             spaceAfter=5,
@@ -88,8 +123,8 @@ class Styles:
         self.h3 = ParagraphStyle(
             "H3",
             fontName=SANS_BOLD,
-            fontSize=10,
-            leading=14,
+            fontSize=12,
+            leading=16,
             textColor=colors.black,
             spaceBefore=8,
             spaceAfter=3,
@@ -105,8 +140,8 @@ class Styles:
         self.caption = ParagraphStyle(
             "Caption",
             fontName=SANS_ITALIC,
-            fontSize=8.5,
-            leading=11,
+            fontSize=10.5,
+            leading=13,
             alignment=TA_CENTER,
             textColor=GREY,
             spaceBefore=3,
@@ -115,8 +150,8 @@ class Styles:
         self.mono = ParagraphStyle(
             "Mono",
             fontName=MONO,
-            fontSize=7.6,
-            leading=10,
+            fontSize=9.8,
+            leading=12.2,
             alignment=TA_LEFT,
             leftIndent=8,
             backColor=colors.HexColor("#f4f6f8"),
@@ -151,25 +186,25 @@ class Styles:
         self.toc_title = ParagraphStyle(
             "TocTitle",
             fontName=SANS_BOLD,
-            fontSize=15,
-            leading=20,
+            fontSize=16,
+            leading=21,
             textColor=ACCENT,
             spaceAfter=12,
         )
         self.toc1 = ParagraphStyle(
-            "TOC1", fontName=SANS_BOLD, fontSize=10, leading=16, leftIndent=0
+            "TOC1", fontName=SANS_BOLD, fontSize=10.5, leading=13, leftIndent=0
         )
         self.toc2 = ParagraphStyle(
-            "TOC2", fontName=SANS, fontSize=9.5, leading=14, leftIndent=16
+            "TOC2", fontName=SANS, fontSize=10, leading=12, leftIndent=16
         )
         self.table_cell = ParagraphStyle(
-            "Cell", fontName=SANS, fontSize=8.2, leading=10.5, alignment=TA_LEFT
+            "Cell", fontName=SANS, fontSize=10, leading=12, alignment=TA_LEFT
         )
         self.table_head = ParagraphStyle(
             "CellHead",
             fontName=SANS_BOLD,
-            fontSize=8.2,
-            leading=10.5,
+            fontSize=10,
+            leading=12,
             alignment=TA_LEFT,
             textColor=colors.white,
         )
@@ -208,15 +243,62 @@ class ReportDoc(BaseDocTemplate):
 
     # ---------------------------------------------------------------- painting
     def _cover_page(self, canvas, doc):
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import Paragraph
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.colors import HexColor, black
+
         canvas.saveState()
-        canvas.setStrokeColor(ACCENT)
-        canvas.setLineWidth(3)
-        canvas.line(doc.leftMargin, A4[1] - 34 * mm, A4[0] - doc.rightMargin, A4[1] - 34 * mm)
+        navy = HexColor("#245783")
+        def centered(text, top, size, font=SANS, color=black, width=505, leading=None):
+            style=ParagraphStyle("cover", fontName=font, fontSize=size,
+                                 leading=leading or size*1.25,
+                                 textColor=color, alignment=TA_CENTER)
+            p=Paragraph(text,style); _,height=p.wrap(width,150)
+            p.drawOn(canvas,(A4[0]-width)/2,top-height)
+            return height
+        centered("HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG<br/>"
+                 "KHOA CÔNG NGHỆ THÔNG TIN 1", 768, 14,
+                 SANS_BOLD,leading=17)
+        canvas.setStrokeColor(navy)
+        canvas.setLineWidth(.6)
+        canvas.line(A4[0]/2-87, 714, A4[0]/2+87, 714)
+        centered("HỌC PHẦN: HỆ THỐNG PHÂN TÁN", 654, 14,
+                 SANS_BOLD, HexColor("#414141"))
+        centered("BÀI TẬP LỚN", 627, 13.5, color=HexColor("#444444"))
+        centered("BÁO CÁO BÀI TẬP LỚN", 559, 22, SANS_BOLD,navy)
+        centered("Đề tài DS02", 526, 15, SANS_ITALIC,navy)
+        centered("Hệ thống chia sẻ tệp P2P<br/>mô phỏng BitTorrent", 482, 17,
+                 SANS_BOLD,leading=23)
+
+        labelstyle=ParagraphStyle("cover-label",fontName=SANS_BOLD,
+                                  fontSize=13,leading=16,alignment=TA_LEFT)
+        valuestyle=ParagraphStyle("cover-value",fontName=SANS,
+                                  fontSize=13,leading=16,alignment=TA_LEFT)
+        rows=[("Tên hệ thống", "DS02 — Hệ thống chia sẻ tệp P2P<br/>mô phỏng BitTorrent"),
+              ("Nhóm thực hiện", "Nhóm 11"),
+              ("Lớp học phần", "INT1405_CLC-20261-01"),
+              ("Ngày nộp", "22/11/2026")]
+        top=390
+        for label,value in rows:
+            lp=Paragraph(label,labelstyle);vp=Paragraph(value,valuestyle)
+            _,lh=lp.wrap(154,80);_,vh=vp.wrap(310,80)
+            height=max(lh,vh)+10
+            lp.drawOn(canvas,76,top-4-lh)
+            vp.drawOn(canvas,242,top-4-vh)
+            canvas.setStrokeColor(HexColor("#999999"))
+            canvas.setLineWidth(.35);canvas.setDash(1,1.5)
+            canvas.line(44,top-height,551,top-height)
+            canvas.setDash()
+            top-=height
+        centered("Hà Nội, tháng 11 năm 2026", 81, 13.5, SANS_ITALIC)
         canvas.restoreState()
 
     def _body_page(self, canvas, doc):
         canvas.saveState()
-        canvas.setFont(SANS, 7.5)
+        canvas.setFont(SANS, 9)
         canvas.setFillColor(GREY)
         canvas.drawString(doc.leftMargin, A4[1] - 13 * mm, self.report_title)
         canvas.drawRightString(
@@ -336,7 +418,7 @@ def rich(text):
     )
     escaped = re.sub(
         r"`(.+?)`",
-        r'<font name="%s" size="8.6" color="#243b53">\1</font>' % MONO,
+        r'<font name="%s" size="11" color="#243b53">\1</font>' % MONO,
         escaped,
     )
     return Paragraph(escaped, _styles().body)
@@ -357,7 +439,7 @@ def _inline(text):
     escaped = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", escaped)
     escaped = re.sub(
         r"`(.+?)`",
-        r'<font name="%s" size="8.6" color="#243b53">\1</font>' % MONO,
+        r'<font name="%s" size="11" color="#243b53">\1</font>' % MONO,
         escaped,
     )
     return escaped
@@ -479,7 +561,7 @@ def _arrow(d, x1, y1, x2, y2, label=None, dashed=False, colour=None, label_dy=3,
                 ly + label_dy,
                 label,
                 fontName=SANS,
-                fontSize=6.2,
+                fontSize=8,
                 fillColor=GREY,
                 textAnchor="middle",
             )
@@ -514,7 +596,7 @@ def architecture_diagram(width, height):
             tracker_w,
             tracker_h,
             ["TrackerApp (HTTP, in-memory)", "POST /announce · GET /peers", "metadata only — never file bytes"],
-            size=7.2,
+            size=8.7,
         )
     )
 
@@ -523,7 +605,7 @@ def architecture_diagram(width, height):
     xs = [width * 0.04, width * 0.385, width * 0.73]
     labels = [["Peer 1", "(seeder)"], ["Peer 2", "(leecher → seeder)"], ["Peer 3", "(leecher)"]]
     for x, label in zip(xs, labels):
-        d.add(_box(d, x, peer_y, peer_w, peer_h, label, size=7.2))
+        d.add(_box(d, x, peer_y, peer_w, peer_h, label, size=8.7))
 
     # Control plane: every peer announces to the tracker (dashed).
     for x in xs:
@@ -551,7 +633,7 @@ def architecture_diagram(width, height):
 
     # Data plane: chunk bytes move only peer-to-peer (solid).
     mid = peer_y + peer_h / 2.0
-    _arrow(d, xs[0] + peer_w, mid, xs[1], mid, "chunk bytes (TCP)")
+    _arrow(d, xs[0] + peer_w, mid, xs[1], mid, "TCP")
     _arrow(d, xs[1] + peer_w, mid, xs[2], mid, None)
     d.add(
         String(
@@ -607,7 +689,7 @@ def frame_diagram(width, height):
     fields = [
         ("Length (4 B, big-endian)", 0.22, ACCENT_LIGHT),
         ("Msg ID (1 B)", 0.17, colors.HexColor("#e8eef6")),
-        ("Payload (0 … 8 MB)", 0.61, ACCENT_LIGHT),
+        ("Payload (length - 1 B)", 0.61, ACCENT_LIGHT),
     ]
     x = 4
     y = height * 0.34
@@ -666,9 +748,11 @@ def sequence_diagram(width, height):
         (0, 1, "GET /peers?file_id"),
         (1, 0, "[{peer_id, ip, port, bitfield}]"),
         (0, 2, "HANDSHAKE(peer_id, file_id)"),
-        (2, 0, "BITFIELD"),
-        (0, 2, "INTERESTED → UNCHOKE"),
-        (0, 2, "REQUEST(i) → PIECE(i) × N"),
+        (2, 0, "HANDSHAKE + BITFIELD"),
+        (0, 2, "INTERESTED"),
+        (2, 0, "UNCHOKE (slot granted)"),
+        (0, 2, "REQUEST(i), pipelined"),
+        (2, 0, "PIECE(i, data), repeat for missing chunks"),
     ]
     step_h = (top - 22 - bottom) / (len(steps) + 0.5)
     y = top - 20
@@ -685,7 +769,7 @@ def sequence_diagram(width, height):
                 y + 2.5,
                 label,
                 fontName=SANS,
-                fontSize=6.2,
+                fontSize=8,
                 fillColor=colors.HexColor("#243b53"),
             )
         )
@@ -701,4 +785,27 @@ def sequence_diagram(width, height):
             fillColor=GREY,
         )
     )
+    return d
+
+
+def peer_flow_diagram(width=470,height=125):
+    from reportlab.graphics.shapes import Drawing,Line,String
+    d=Drawing(width,height)
+    gap=10;bw=(width-4*gap)/5;bh=48;y=30
+    labels=[['TrackerClient','Tìm nguồn HTTP'],['DownloadManager','Tải + kiểm tra hash'],
+            ['FileManager','Ghi theo offset'],['StateManager','Bitfield + SQLite'],
+            ['UploadServer','Phục vụ mảnh tốt']]
+    for i,label in enumerate(labels):
+        x=i*(bw+gap)
+        d.add(_box(d,x,y,bw,bh,label,size=8.4))
+        if i<4:
+            _arrow(d,x+bw,y+bh/2,x+bw+gap,y+bh/2)
+    x1=3*(bw+gap)+bw/2;x2=bw/2;top=103
+    d.add(Line(x1,y+bh,x1,top,strokeColor=RULE,strokeWidth=.8,strokeDashArray=[3,2]))
+    _arrow(d,x1,top,x2,top)
+    d.add(Line(x2,top,x2,y+bh,strokeColor=RULE,strokeWidth=.8,strokeDashArray=[3,2]))
+    d.add(String((x1+x2)/2,top+5,'Announce khi có mảnh mới',fontName=SANS_ITALIC,
+                 fontSize=9,textAnchor='middle',fillColor=GREY))
+    d.add(String(width/2,7,'Các mô-đun thuộc cùng một tiến trình PeerApp; không phải các node riêng.',
+                 fontName=SANS_ITALIC,fontSize=9,textAnchor='middle',fillColor=GREY))
     return d

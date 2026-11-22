@@ -1,9 +1,4 @@
-"""Report body, part A: front matter through section 10.
-
-Sections follow the 19-item outline in the course specification, §10.2.
-Every number in here was measured on this repository (see docs/bench/results.csv
-and the demo run in §14), not estimated.
-"""
+"""Report body: cover and sections 2–10; results load from recorded evidence."""
 
 from reportlab.lib.units import mm
 from reportlab.platypus import NextPageTemplate, PageBreak, Spacer
@@ -16,6 +11,7 @@ from report_lib import (
     GREY,
     ReportDoc,
     architecture_diagram,
+    peer_flow_diagram,
     bullets,
     caption,
     code,
@@ -39,160 +35,51 @@ TITLE_RUNNING = "Báo cáo kỹ thuật — P2P File-Sharing System (DS02)"
 
 MEMBERS = [
     # github login, display name, student id, main responsibility, evidence
-    ("huynhhoang04", "Em Huynh", "Điền MSSV",
+    ("huynhhoang04", "Hoàng Văn Huynh", "B23DCDT131",
      "Tracker service (registry, HTTP API, client), M4 peer networking "
      "(upload server, download manager, state manager, CLI), Web UI, CI + demo hardening",
-     "Issues #1–#8, #21; PR #25, #26"),
-    ("giaback", "giaback", "Điền MSSV",
+     "a1207bc, 81c7aa1, 6a06265; tích hợp Web UI qua PR #25"),
+    ("giaback", "Nguyễn Gia Bách", "B23DCVT042",
      "M5 tải song song đa nguồn, connection limiting / choking, full-duplex, "
      "concurrency tests; M6 fault tolerance, demo automation, ncurses TUI",
-     "Issues #9–#14; PR #19, #20"),
-    ("TruongNguyen2703", "Nguyễn Hữu Trường", "Điền MSSV",
+     "2b05515, fafe5bb, c45a9db, dfdc6fc; PR #19, #21"),
+    ("TruongNguyen2703", "Nguyễn Hữu Trường", "B23DCVT424",
      "Container hóa (Docker/Compose), sửa crash tracker, ASan + profiling + code cleanup, "
      "README / .env.example / final test / release tag",
-     "Issues #15, #16, #18; PR #22, #23, #24"),
+     "a94a8f5, 012e362, 5e06734; PR #22–#24"),
 ]
 
 
 def front_matter(doc):
-    """Cover page and table of contents."""
     from reportlab.platypus import Paragraph
+    return [NextPageTemplate("body"), Spacer(1, 1), PageBreak(),
+            Paragraph("Mục lục", doc.styles_toc_title), doc.toc, PageBreak()]
 
-    story = [NextPageTemplate("body")]
-    story.append(Spacer(1, 42 * mm))
-    story.append(Paragraph("BÁO CÁO KỸ THUẬT", doc.styles_cover_sub))
-    story.append(Spacer(1, 6 * mm))
-    story.append(Paragraph("Hệ thống chia sẻ tệp P2P<br/>mô phỏng BitTorrent", doc.styles_cover_title))
-    story.append(Spacer(1, 4 * mm))
-    story.append(
-        Paragraph(
-            "Chia nhỏ tệp thành mảnh · tải song song đa nguồn · kiểm tra toàn vẹn SHA-256 · "
-            "chịu lỗi và phục hồi sau sự cố",
-            doc.styles_cover_sub,
-        )
-    )
-    story.append(Spacer(1, 26 * mm))
-    story.append(
-        Paragraph(
-            "<b>Môn học:</b> %s<br/>"
-            "<b>Mã đề tài:</b> DS02<br/>"
-            "<b>Nhóm:</b> 03 thành viên<br/>"
-            "<b>Học viện Công nghệ Bưu chính Viễn thông (PTIT)</b>" % COURSE,
-            doc.styles_cover_meta,
-        )
-    )
-    story.append(Spacer(1, 18 * mm))
-    rows = [(m[1], m[2], m[0]) for m in MEMBERS]
-    story.append(
-        table(
-            ["Thành viên", "MSSV", "GitHub"],
-            rows,
-            widths=[0.44, 0.28, 0.28],
-            align="CENTER",
-        )
-    )
-    story.append(Spacer(1, 14 * mm))
-    story.append(
-        Paragraph(
-            "Học kỳ 1 · Năm học 2026–2027<br/>"
-            "Hạn nộp: 22/11/2026 · Demo và vấn đáp: 23/11/2026 và 30/11/2026",
-            doc.styles_cover_sub,
-        )
-    )
-
-    story.append(PageBreak())
-    story.append(Paragraph("Mục lục", doc.styles_toc_title))
-    story.append(doc.toc)
-    story.append(PageBreak())
-    return story
 
 
 def section_2_task_assignment(doc):
-    """2. Group information and task assignment."""
-    story = [
-        h1("2. Thông tin nhóm và phân công công việc"),
-        rich(
-            "Nhóm gồm ba thành viên, mỗi người phụ trách một nhóm thành phần riêng và "
-            "đều tham gia kiểm thử chéo. Bảng dưới đây được đối chiếu trực tiếp từ lịch sử "
-            "GitHub của kho mã nguồn: mỗi mốc công việc đều có Issue được giao và Pull Request "
-            "tương ứng đã được trộn vào nhánh `main`."
-        ),
-        spacer(2),
-        table(
-            ["Thành viên", "Phụ trách chính", "Minh chứng trong kho"],
-            [(m[1], m[3], m[4]) for m in MEMBERS],
-            widths=[0.17, 0.53, 0.30],
-        ),
-        caption("Bảng 2.1 — Phân công công việc và minh chứng trên GitHub."),
-        rich(
-            "**Nguyên tắc phối hợp.** Nhánh `main` chỉ nhận thay đổi qua Pull Request có ít nhất "
-            "một thành viên khác đọc lại; mỗi PR gắn với một Issue theo mốc M3–M7. Điều này tạo ra "
-            "lịch sử commit có thể truy vết cho từng thành viên, đáp ứng yêu cầu “each member must be "
-            "responsible for a specific part” của đề bài."
-        ),
-        rich(
-            "**Cách tính đóng góp.** Ở thời điểm nộp bài, nhánh `main` trên GitHub có 35 commit: 17 commit của "
-            "`giaback`, 15 của `huynhhoang04` (8 dưới tên `huynhhoang04`, 7 dưới tên hiển thị `Em huynh` — cùng một "
-            "tài khoản), và 3 của `TruongQuynh` (tài khoản `TruongNguyen2703`). Số commit không phản ánh đầy đủ "
-            "khối lượng: các PR #19 và #20 của `giaback` mang phần lớn logic tải song song và chịu lỗi, còn các "
-            "PR #22–#24 của `TruongNguyen2703` tập trung vào hạ tầng và độ ổn định."
-        ),
-        spacer(3),
-        h2("2.1. Phân chia theo mốc"),
-        table(
-            ["Mốc", "Nội dung", "Người phụ trách", "Trạng thái"],
-            [
-                ("M0–M2", "Khung dự án, SHA-256, metadata, wire protocol, SQLite CRUD", "Cả nhóm", "Hoàn thành"),
-                ("M3", "Tracker service: peer registry, HTTP API, tracker client", "huynhhoang04", "Hoàn thành"),
-                ("M4", "Peer networking: upload server, download manager, state manager, CLI", "huynhhoang04", "Hoàn thành"),
-                ("M5", "Tải song song đa nguồn, connection limiting, full-duplex, concurrency tests", "giaback", "Hoàn thành"),
-                ("M6", "Chịu lỗi, 7 kịch bản demo tự động, giao diện ncurses", "giaback", "Hoàn thành"),
-                ("M7", "Docker, profiling, dọn mã nguồn, README, .env.example, release tag", "TruongNguyen2703", "Hoàn thành"),
-                ("M7", "Báo cáo kỹ thuật và slide thuyết trình", "Cả nhóm", "Hoàn thành"),
-            ],
-            widths=[0.09, 0.53, 0.20, 0.18],
-        ),
-        caption("Bảng 2.2 — Phân công theo cột mốc của kế hoạch dự án."),
+    return [h1("2. Thông tin nhóm và phân công công việc"),
+        rich("Nhóm 11 thực hiện đề tài DS02 thuộc học phần **Hệ thống phân tán**, lớp **INT1405_CLC-20261-01**. Nhóm gồm **Hoàng Văn Huynh — B23DCDT131**, **Nguyễn Gia Bách — B23DCVT042** và **Nguyễn Hữu Trường — B23DCVT424**."),
+        table(["Thành viên / GitHub","Phần việc chính","Minh chứng đóng góp"],
+              [(m[1]+" / "+m[0],m[3],m[4]) for m in MEMBERS],widths=[.24,.46,.30]),
+        caption("Bảng 2.1 — Phân công công việc và commit/PR tương ứng trong kho mã nguồn [2]."),
+        h2("2.1. Tổ chức công việc"),
+        rich("Công việc được chia theo ranh giới thành phần: tracker và tích hợp hệ thống; cơ chế trao đổi mảnh, tải song song và phục hồi; triển khai và ổn định môi trường chạy. Các thành phần dùng chung cấu trúc metadata, định danh tệp, khung thông điệp và quy tắc kiểm tra SHA-256 để kết nối thành một hệ thống thống nhất."),
+        rich("Các thay đổi được quản lý bằng Git, Issue và Pull Request. Kết quả tích hợp được đánh giá qua kiểm thử chức năng, đồng thời, lỗi–phục hồi, dữ liệu không hợp lệ và thí nghiệm hiệu năng. Mỗi thành viên cần hiểu kiến trúc chung và giải thích được cơ chế thuộc phần việc của mình theo yêu cầu của học phần [1]."),
     ]
-    return story
+
+
 
 
 def section_3_abstract():
-    return [
-        h1("3. Tóm tắt (Abstract)"),
-        rich(
-            "Báo cáo trình bày một hệ thống chia sẻ tệp ngang hàng (peer-to-peer) hoạt động theo mô hình "
-            "BitTorrent, được cài đặt từ đầu bằng C++17 trên Linux và Windows. Hệ thống gồm hai loại tiến "
-            "trình độc lập: **TrackerApp** — một máy chủ HTTP chỉ quản lý siêu dữ liệu và danh sách peer, "
-            "tuyệt đối không giữ hay chuyển tiếp nội dung tệp; và **PeerApp** — tiến trình lai vừa là máy chủ "
-            "TCP phục vụ mảnh dữ liệu, vừa là trình tải đa luồng, vừa là giao diện người dùng "
-            "(dòng lệnh, ncurses TUI hoặc Web dashboard)."
-        ),
-        rich(
-            "Tệp được chia thành các mảnh (chunk) kích thước cố định, mỗi mảnh được băm SHA-256 độc lập và "
-            "toàn bộ tệp có thêm một mã băm tổng. Siêu dữ liệu `.torrent.json` đóng vai trò “hợp đồng” giữa "
-            "người chia sẻ và người tải: nó cho phép xác minh từng mảnh ngay khi nhận và xác minh lần cuối "
-            "sau khi ghép. Định danh tệp chính là mã băm SHA-256 của toàn bộ nội dung, nhờ đó hai tệp trùng "
-            "nội dung luôn trùng định danh mà không cần cơ chế đặt tên tập trung."
-        ),
-        rich(
-            "Về mặt hệ thống phân tán, đồ án hiện thực hóa sáu nhóm vấn đề: định danh và khám phá peer qua "
-            "tracker; đồng thời và đồng bộ hóa với thread pool, mutex và SQLite ở chế độ WAL; nhất quán cuối "
-            "cùng cho bitfield kèm kiểm tra toàn vẹn theo từng mảnh; chịu lỗi với timeout, retry có giới hạn, "
-            "danh sách đen theo từng mảnh và phục hồi trạng thái sau khi tiến trình bị kill; trao đổi mảnh "
-            "trùng lặp / sai thứ tự nhờ chỉ số mảnh và tính lũy đẳng; và các kiểm soát đầu vào cơ bản."
-        ),
-        rich(
-            "Kết quả đo trên một máy 8 lõi: 42 bài kiểm thử tự động (41 chạy, 1 bài chỉ dành cho Windows bị bỏ "
-            "qua có chủ đích) và 7/7 kịch bản demo bắt buộc đều đạt. Trong thí nghiệm hiệu năng có kiểm soát, "
-            "thời gian tải giảm gần tuyến tính theo số nguồn: 20,53 s với 1 nguồn, 10,54 s với 2 nguồn và "
-            "7,05 s với 3 nguồn cho cùng một tệp 100 MB; bộ nhớ đỉnh giữ ổn định khoảng 12–14 MB."
-        ),
-        rich(
-            "**Từ khóa:** peer-to-peer, BitTorrent, tracker, chia nhỏ dữ liệu, tải song song, SHA-256, "
-            "nhất quán cuối cùng, chịu lỗi, SQLite WAL, C++17."
-        ),
+    return [h1("3. Tóm tắt (Abstract)"),
+        rich("Đồ án xây dựng nguyên mẫu chia sẻ tệp ngang hàng cho đề tài DS02 bằng C++17. `TrackerApp` quản lý ánh xạ giữa mã tệp và các peer đang giữ mảnh; `PeerApp` vừa tải mảnh qua TCP, vừa phục vụ các mảnh đã xác minh cho peer khác. Bố trí tối thiểu theo đề bài là **1 tracker và 3 peer độc lập**. Tracker không lưu hoặc chuyển tiếp nội dung tệp."),
+        rich("Metadata JSON chứa kích thước, danh sách SHA-256 từng mảnh và SHA-256 toàn tệp. Scheduler chia việc giữa các kết nối, chọn mảnh đầu ngẫu nhiên rồi ưu tiên mảnh hiếm theo thông tin đã biết. Mutex bảo vệ trạng thái nội bộ; SQLite lưu tiến độ cục bộ để phục hồi. Timeout, retry hữu hạn và loại nguồn theo từng mảnh xử lý trường hợp mất nguồn hoặc dữ liệu sai."),
+        rich('Kết quả đánh giá ngày 22/11/2026 ghi nhận **48 bài được đăng ký: 47 PASS và 1 SKIP trên Linux** ở cả bản Release và Debug có ASan/UBSan. Bảy kịch bản tự động đạt; các kiểm tra HTTP bổ sung xác minh đường dẫn và tính ổn định của dịch vụ. CSV hiệu năng lưu 12 cấu hình có kiểm tra hash; với tệp 100 MiB và delay 50 ms/mảnh, thời gian giảm khi tăng số nguồn. Số liệu cụ thể ở mục 15 được lấy trực tiếp từ CSV; đây là phép đo loopback một lần cho mỗi cấu hình, chưa phải kết luận về WAN.'),
+        rich("Báo cáo chỉ rõ các giới hạn: tracker đơn, peer ID chưa bền qua lần chạy, metadata cần được tin cậy, chưa xác thực danh tính và phân quyền đầy đủ, chưa mã hóa kênh. Vì vậy, nguyên mẫu thể hiện các cơ chế lõi DS02 nhưng chưa thể được tuyên bố đáp ứng trọn vẹn yêu cầu bảo mật §4.5 [1]."),
+        rich("**Từ khóa:** P2P, tracker, chunk, tải song song đa nguồn, SHA-256, eventual consistency, retry, checkpoint, SQLite, C++17."),
     ]
+
 
 
 def section_4_requirements():
@@ -229,22 +116,33 @@ def section_4_requirements():
             ["Nhóm yêu cầu", "Nội dung", "Cách hệ thống đáp ứng"],
             [
                 ("Phân tán", "≥ 3 tiến trình độc lập, giao tiếp qua mạng",
-                 "1 TrackerApp + N PeerApp; HTTP cho tracker, TCP thô cho dữ liệu"),
+                 "Tối thiểu 1 TrackerApp + 3 PeerApp; HTTP điều khiển, TCP dữ liệu"),
                 ("Định danh", "Mỗi thành phần có định danh duy nhất",
                  "Peer ID duy nhất theo tiến trình; File ID = SHA-256 nội dung"),
                 ("Đồng thời", "Xử lý nhiều kết nối/yêu cầu cùng lúc",
                  "Thread pool ở cả hai phía; mutex + condition_variable bảo vệ trạng thái"),
                 ("Ghi log", "Log nêu node, thời điểm, loại sự kiện, kết quả",
-                 "Logger dùng chung, có mức INFO/SUCCESS/WARN/ERROR"),
+                 "Log theo tiến trình; timestamp và mức sự kiện; đối chiếu Peer ID qua dòng khởi động"),
                 ("Cấu hình", "Không hardcode bí mật; cấu hình qua môi trường",
-                 "`.env.example`; `TRACKER_URL`, `PEER_HOST` đọc từ biến môi trường"),
+                 "Đọc .env và các biến môi trường; CLI được ưu tiên cao nhất"),
                 ("Triển khai", "Chạy được trên nhiều máy/VM/container",
                  "Dockerfile cho từng thành phần + `docker-compose.yml` 4 node"),
             ],
             widths=[0.17, 0.38, 0.45],
         ),
         caption("Bảng 4.1 — Yêu cầu phi chức năng và cách đáp ứng."),
-        h2("4.4. Phạm vi"),
+        h2("4.4. Ma trận đối chiếu đề bài"),
+        table(["Điều khoản [1]", "Thiết kế / bằng chứng", "Đánh giá"], [
+            ("§4.1; §6.2", "1 tracker + ít nhất 3 peer; socket; thư mục riêng; mục 7", "Kiến trúc tối thiểu 4 tiến trình"),
+            ("§4.2; §6.3", "HTTP discovery, TCP framing, định danh, bitfield; mục 8–9", "Đã có trong nguồn"),
+            ("§4.3", "Claim mảnh có khóa, full-duplex, nhiều leecher; mục 10, 14", "Có test đồng thời đã PASS"),
+            ("§4.4; §6.4", "Mất nguồn; mảnh hỏng; checkpoint/resume; mục 11, 14", "Có test lỗi; demo LAN cần lưu log"),
+            ("§4.5", "Giới hạn khung, kiểm tra dữ liệu và prepared statement; mục 12", "Đáp ứng một phần; thiếu xác thực/ACL"),
+            ("§9", "26 chức năng/cấu hình + 9 đồng thời + 3 lỗi + 10 dữ liệu sai; 12 cấu hình đo", "47 PASS, 1 SKIP ở mỗi cấu hình"),
+            ("§10–11", "Báo cáo 19 mục; README; demo; Git; tag/release", "Phân biệt hiện vật đã có và checklist nộp"),
+        ], widths=[.18,.55,.27]),
+        caption("Bảng 4.2 — Truy vết yêu cầu, minh chứng và phần còn giới hạn."),
+        h2("4.5. Phạm vi"),
         rich(
             "Đồ án tập trung vào lõi phân tán: tracker, trao đổi mảnh, đồng thời, chịu lỗi và phục hồi. "
             "Các tính năng nâng cao của BitTorrent thật (DHT, magnet link, mã hóa kênh, thuật toán "
@@ -277,18 +175,14 @@ def section_5_issues():
                 ("Trùng lặp và sai thứ tự", "Cùng một mảnh có thể về từ hai peer; các mảnh về không đúng thứ tự",
                  "Chỉ số mảnh tuyệt đối, ghi lũy đẳng, theo dõi mảnh đang bay (in-flight)"),
                 ("Bảo mật cơ bản", "Peer độc hại gửi dữ liệu giả, khung tin quá lớn, chỉ số ngoài phạm vi",
-                 "Giới hạn kích thước khung, kiểm tra bàn giao, chặn chỉ số ngoài phạm vi, prepared statement"),
+                 "Giới hạn kích thước khung, kiểm tra bắt tay, chặn chỉ số ngoài phạm vi, prepared statement"),
             ],
             widths=[0.19, 0.40, 0.41],
         ),
         caption("Bảng 5.1 — Sáu vấn đề phân tán và cơ chế giải quyết."),
         spacer(2),
         rich(
-            "**Điểm đáng chú ý.** Trong hệ thống này, “nhất quán” không thể là nhất quán mạnh: không có cơ chế "
-            "khóa phân tán nào giữa các peer, và tracker chỉ là bộ nhớ tạm. Thay vào đó hệ thống chọn **nhất "
-            "quán cuối cùng** (eventual consistency) cho bitfield — thông tin “ai giữ mảnh nào” lan truyền theo "
-            "chu kỳ announce — nhưng **nhất quán mạnh cho nội dung**: một mảnh hoặc khớp SHA-256 và được ghi "
-            "nhận, hoặc bị loại. Cách tách hai loại nhất quán này là quyết định thiết kế quan trọng nhất của đồ án."
+            '**Hai thuộc tính khác nhau.** Trạng thái khám phá “ai giữ mảnh nào” được cập nhật qua announce và có thể trễ; thiết kế chấp nhận nhất quán cuối cùng khi các cập nhật được truyền thành công. Nội dung là dữ liệu bất biến, được kiểm tra hash theo metadata tin cậy. Kiểm tra toàn vẹn không phải mô hình nhất quán mạnh và không cần đồng thuận để giải quyết chỉnh sửa cạnh tranh. Mutex/SQLite giải quyết xung đột trong một peer; không dùng chúng làm kênh chia sẻ trạng thái giữa các tiến trình.'
         ),
     ]
 
@@ -302,17 +196,17 @@ def section_6_analysis():
             [
                 ("Khám phá peer", "Tracker tập trung (HTTP)",
                  "DHT phi tập trung",
-                 "**A.** DHT vượt xa phạm vi 10 tuần và khó kiểm chứng; tracker tập trung cho phép "
+                 "**A.** DHT tăng độ phức tạp khám phá và kiểm chứng ở quy mô đồ án; tracker tập trung cho phép "
                  "quan sát toàn bộ trạng thái mạng khi demo, và đề bài DS02 cho phép rõ ràng"),
                 ("Kênh dữ liệu", "TCP thô + khung tin nhị phân",
                  "HTTP cho từng mảnh",
-                 "**A.** HTTP thêm phần đầu gói tin cho mỗi mảnh 256 KB và không giữ được kết nối lâu; "
+                 "**A.** HTTP có thể hỗ trợ keep-alive nhưng cần thiết kế API/truyền mảnh riêng; "
                  "TCP thô cho phép pipeline nhiều REQUEST trên một kết nối"),
-                ("Kích thước mảnh", "256 KB cố định", "Theo tham số dòng lệnh",
-                 "**Cả hai.** Mặc định 256 KB, cho phép `--chunk-size` để đo ảnh hưởng của chi phí cố định"),
+                ("Kích thước mảnh", "256 KiB cố định", "Theo tham số dòng lệnh",
+                 "**Cả hai.** Mặc định 256 KiB, cho phép `--chunk-size` để đo ảnh hưởng của chi phí cố định"),
                 ("Lưu trạng thái peer", "SQLite (WAL)", "File JSON",
                  "**A.** Cần cập nhật trạng thái từng mảnh với tần suất cao và đồng thời; WAL cho phép "
-                 "đọc/ghi song song mà không khóa toàn bộ tệp"),
+                 "reader và writer cùng tiến triển; vẫn chỉ có một writer SQLite tại một thời điểm"),
                 ("Chọn mảnh", "Tuần tự", "Random-first + rarest-first",
                  "**B.** Random-first giúp peer sớm có dữ liệu để chia sẻ; rarest-first phân tán dữ liệu "
                  "hiếm và tăng khả năng sống sót của swarm"),
@@ -328,13 +222,13 @@ def section_6_analysis():
         rich(
             "Nếu tracker phục vụ mảnh dữ liệu, hệ thống suy biến thành mô hình máy chủ tệp tập trung: băng thông "
             "của tracker trở thành nút thắt và là điểm chết duy nhất. Trong thiết kế này, tracker chỉ trả lời hai "
-            "câu hỏi — “peer này giữ tệp X với bitfield nào” và “những ai giữ tệp X” — nên nó có thể phục vụ hàng "
-            "trăm peer bằng vài chục byte mỗi chu kỳ. Hệ quả là một tracker có thể chết mà các luồng đang tải "
-            "giữa các peer vẫn tiếp tục, đúng như kịch bản chịu lỗi ở mục 11."
+            "câu hỏi — “peer này giữ tệp X với bitfield nào” và “những ai giữ tệp X” — nên nó có thể phục vụ "
+            "nhiều peer mà không gánh lưu lượng nội dung. Payload bitfield vẫn tăng theo số mảnh, và tải truy vấn tăng theo số peer. Khi tracker dừng, các kết nối dữ liệu đã biết có thể tiếp tục "
+            "giữa các peer nếu còn đủ nguồn; khám phá peer mới sẽ bị ảnh hưởng (mục 11)."
         ),
         h2("6.3. Vì sao chọn tải song song theo mảnh"),
         rich(
-            "Tải tuần tự một tệp 100 MB từ một nguồn bị chặn bởi độ trễ khứ hồi và tốc độ của nguồn đó. Chia "
+            "Tải tuần tự một tệp 100 MiB từ một nguồn bị chặn bởi độ trễ khứ hồi và tốc độ của nguồn đó. Chia "
             "thành mảnh cho phép ba lợi ích đồng thời: (i) nhiều nguồn cùng phục vụ một tệp; (ii) mảnh lỗi chỉ "
             "cần tải lại một mảnh; (iii) một peer vừa tải xong mảnh đầu tiên đã có thể phục vụ mảnh đó cho peer "
             "khác. Thí nghiệm ở mục 15 định lượng lợi ích thứ nhất; bài kiểm thử "
@@ -346,87 +240,73 @@ def section_6_analysis():
             "Hệ thống giả định mô hình lỗi **crash-stop** kết hợp **mất kết nối tạm thời**: một peer có thể biến "
             "mất bất cứ lúc nào mà không thông báo, có thể gửi dữ liệu hỏng, và mạng có thể trễ. Hệ thống không "
             "giả định lỗi Byzantine phức tạp (peer nói dối một cách tinh vi) ngoài phạm vi dữ liệu sai lệch, vì "
-            "mã băm SHA-256 đã đủ để phát hiện mọi sai lệch nội dung."
+            "SHA-256 hỗ trợ phát hiện sai lệch với metadata tin cậy; nó không xác thực người gửi và không chống việc thay cả metadata lẫn tệp."
         ),
     ]
 
 
 def section_7_architecture():
-    return [
-        h1("7. Kiến trúc hệ thống"),
-        h2("7.1. Tổng quan"),
-        rich(
-            "Hệ thống gồm hai loại tiến trình độc lập, không dùng bộ nhớ chung và không đọc chung tệp trạng thái: "
-            "**TrackerApp** và **PeerApp**. Mọi giao tiếp đều qua socket. Tracker chạy một máy chủ HTTP; peer chạy "
-            "một máy chủ TCP phục vụ mảnh và một hoặc nhiều giao diện người dùng."
-        ),
-        architecture_diagram(430, 148),
-        caption("Hình 7.1 — Kiến trúc vận hành: tracker chỉ quản lý siêu dữ liệu, mảnh dữ liệu đi trực tiếp giữa các peer."),
-        rich(
-            "Đường nét đứt là luồng điều khiển (announce/khám phá) qua HTTP. Đường nét liền là luồng dữ liệu qua "
-            "TCP thô. Không có đường nào từ tracker tới nội dung tệp — đây là ràng buộc kiến trúc được kiểm chứng "
-            "bằng kịch bản demo 1 và 3."
-        ),
-        h2("7.2. Thành phần và trách nhiệm"),
-        rich(
-            "Bảng 7.1 chia thành phần theo tiến trình sở hữu. `CommonLib` là thư viện tĩnh mà cả hai tiến trình liên "
-            "kết vào, nên nó không phải một tiến trình thứ ba; ba tiến trình độc lập của hệ thống là một TrackerApp và "
-            "các PeerApp (tối thiểu hai để tạo thành một swarm)."
-        ),
-        table(
-            ["Thành phần", "Sở hữu", "Trách nhiệm chính"],
-            [
-                ("TrackerServer", "TrackerApp", "Định tuyến HTTP `/announce`, `/peers`, `/health`; kiểm tra dữ liệu vào"),
-                ("PeerRegistry", "TrackerApp", "Ánh xạ file_id → danh sách peer; thread-safe; dọn peer quá hạn"),
-                ("PeerNode", "PeerApp", "Điều phối vòng đời: khởi tạo, heartbeat, seed, download, dừng"),
-                ("UploadServer", "PeerApp", "Thread pool phục vụ REQUEST/PIECE; choke/unchoke; giới hạn slot"),
-                ("DownloadManager", "PeerApp", "Chọn mảnh, pipeline, xác minh SHA-256, blacklist, retry"),
-                ("StateManager", "PeerApp", "Bitfield trong RAM + đồng bộ SQLite; nạp lại khi khởi động"),
-                ("FileManager", "PeerApp", "Đọc/ghi mảnh theo offset; tạo tệp đích; ghép tệp"),
-                ("TrackerClient", "PeerApp", "HTTP client tối giản: announce, get_peers, health_check"),
-                ("Database", "PeerApp", "Bọc SQLite3, WAL, prepared statement, mutex ở lớp ứng dụng"),
-                ("Tui / WebUi", "PeerApp", "ncurses dashboard; HTTP dashboard + thao tác seed/download"),
-            ],
-            widths=[0.21, 0.13, 0.66],
-        ),
-        caption("Bảng 7.1 — Thành phần của hai tiến trình (trích các thành phần chính)."),
-        table(
-            ["Thành phần", "Sở hữu", "Trách nhiệm chính"],
-            [
-                ("Metadata", "CommonLib", "Sinh và đọc `.torrent.json`; băm từng mảnh và toàn tệp"),
-                ("SHA256", "CommonLib", "Bọc OpenSSL EVP; băm buffer và băm tệp theo luồng"),
-                ("Protocol", "CommonLib", "Khung tin nhị phân: serialize/deserialize, giới hạn kích thước"),
-                ("Logger", "CommonLib", "Log thread-safe, có mức độ và sink thay thế được (CLI/TUI/Web)"),
-                ("net", "CommonLib", "Bọc socket POSIX/Winsock: timeout, resolve IPv4, dò IP ra ngoài"),
-            ],
-            widths=[0.21, 0.13, 0.66],
-        ),
-        caption("Bảng 7.2 — Thư viện dùng chung `CommonLib`, liên kết vào cả hai tiến trình."),
-        spacer(2),
-        h2("7.3. Triển khai"),
-        rich(
-            "Kho mã nguồn cung cấp hai Dockerfile nhiều tầng (builder → runtime) và một `docker-compose.yml` dựng "
-            "một mạng bridge riêng với 4 node: 1 tracker và 3 peer có hostname riêng (`tracker`, `peer-seeder`, "
-            "`peer-leecher-1`, `peer-leecher-2`). Mỗi peer dùng một volume riêng nên trạng thái SQLite độc lập. "
-            "Cách này cho phép mô phỏng nhiều nút mạng trên một máy, đúng như đề bài cho phép khi không có nhiều "
-            "kết nối Internet thật."
-        ),
-        code(
-            """# deploy/docker-compose.yml (rút gọn)
-services:
-  tracker:            # 8080:8080, network aliases: tracker
-  peer-seeder:        # TRACKER_URL=http://tracker:8080, PEER_HOST=peer-seeder
-  peer-leecher-1:     # TRACKER_URL=http://tracker:8080, PEER_HOST=peer-leecher-1
-  peer-leecher-2:     # TRACKER_URL=http://tracker:8080, PEER_HOST=peer-leecher-2
-networks:
-  p2p_network: { driver: bridge }"""
-        ),
-        rich(
-            "Biến `PEER_HOST` là phần bổ sung quan trọng cho môi trường container: bên trong mạng bridge, địa chỉ "
-            "IP mà tracker quan sát được là IP nội bộ của container, nhưng peer cần công bố hostname mà các "
-            "container khác phân giải được. Peer đọc `PEER_HOST` trước, sau đó mới tự dò IP ra ngoài."
-        ),
+    return [h1("7. Kiến trúc hệ thống"),
+        h2("7.1. Mô hình P2P có tracker"),
+        rich("Hệ thống sử dụng mô hình **P2P có tracker tập trung**: tracker hỗ trợ các peer tìm thấy nhau, còn peer trực tiếp trao đổi mảnh dữ liệu. Kiến trúc gồm hai loại chương trình độc lập là TrackerApp và PeerApp. Một cấu hình tối thiểu theo DS02 có **1 TrackerApp và ít nhất 3 PeerApp**, tương ứng ít nhất bốn tiến trình giao tiếp qua mạng [1]."),
+        rich("Tracker là điểm tập trung của thông tin khám phá, không phải máy chủ phân phối tệp. Một peer không cố định là bên gửi hoặc bên nhận: nó là leecher khi còn thiếu mảnh và trở thành seeder khi giữ đủ tệp; trong cả hai trạng thái, nó có thể phục vụ những mảnh đã xác minh. Do đó khả năng cung cấp dữ liệu của swarm tăng khi người tải bắt đầu sở hữu mảnh hợp lệ."),
+        architecture_diagram(460,165),
+        caption("Hình 7.1 — Kiến trúc logic: tracker phục vụ khám phá qua HTTP; dữ liệu mảnh truyền trực tiếp qua TCP giữa các peer."),
+        rich("Kiến trúc tách **luồng điều khiển** và **luồng dữ liệu**. Luồng điều khiển gồm announce/heartbeat và tra cứu danh sách peer qua HTTP/JSON. Luồng dữ liệu gồm HANDSHAKE, BITFIELD, REQUEST và PIECE qua kết nối TCP trực tiếp. Đường nét đứt trong hình biểu diễn trao đổi điều khiển; đường liền biểu diễn trao đổi mảnh. Tracker không nhận, lưu hoặc chuyển tiếp nội dung mảnh."),
+        h2("7.2. Thành phần tracker"),
+        rich("TrackerApp chứa TrackerServer và PeerRegistry. TrackerServer tiếp nhận yêu cầu HTTP, kiểm tra định dạng và chuyển thao tác hợp lệ tới registry. PeerRegistry lưu ánh xạ **File ID → danh sách peer**, trong đó mỗi bản ghi có Peer ID, endpoint IP/port, bitfield và last_seen. Đây là danh mục vị trí dữ liệu; không phải bản sao đầy đủ của tệp metadata chứa các hash mảnh."),
+        table(["Thao tác","Trách nhiệm","Kết quả"],[
+            ("POST /announce","Thêm hoặc cập nhật bản ghi theo cặp File ID–Peer ID; làm mới thời điểm hoạt động","Peer được công bố cùng endpoint và các mảnh nó tự khai đang giữ"),
+            ("GET /peers?file_id=…","Lấy snapshot các peer đang đăng ký cho tệp","Danh sách địa chỉ và bitfield để bên tải chọn nguồn"),
+            ("GET /health","Trả trạng thái dịch vụ và số bản ghi peer","Hỗ trợ kiểm tra khả năng truy cập tracker"),
+            ("Dọn bản ghi quá hạn","Định kỳ loại peer có last_seen quá ngưỡng lease","Giảm danh sách nguồn không còn khả dụng"),
+        ],widths=[.25,.43,.32]),
+        caption("Bảng 7.1 — Chức năng của tracker và ranh giới dữ liệu được quản lý."),
+        rich("Registry được lưu trong RAM và bảo vệ bằng mutex để yêu cầu announce, truy vấn và dọn peer không làm hỏng trạng thái khi chạy đồng thời. Peer heartbeat khoảng 15 giây; tracker quét khoảng 10 giây và loại bản ghi cũ hơn 45 giây. Thông tin trả về có thể trễ so với thực tế: bên tải vẫn phải thử kết nối và kiểm tra bitfield trong phiên TCP, không coi một địa chỉ từ tracker là bảo đảm nguồn còn sống."),
+        h2("7.3. Thành phần bên trong một peer"),
+        rich("PeerApp được điều phối bởi PeerNode. PeerNode tạo các thành phần lưu trữ và mạng, khởi động dịch vụ upload, quản lý phiên tải, duy trì heartbeat và cung cấp snapshot cho giao diện. Các mô-đun dưới đây nằm trong **cùng một tiến trình peer**; chúng không được tính thành các node phân tán riêng."),
+        table(["Mô-đun","Trách nhiệm chính","Dữ liệu / tài nguyên quản lý"],[
+            ("TrackerClient","Announce và tìm nguồn qua HTTP","Endpoint tracker, danh sách peer theo File ID"),
+            ("DownloadManager","Chọn mảnh, phân công worker, pipeline yêu cầu, kiểm tra hash và retry","Pending/claimed/in-flight; các session tải; ngân sách lỗi"),
+            ("UploadServer","Nhận kết nối TCP, bắt tay và trả mảnh đã có; giới hạn slot","Socket lắng nghe, hàng đợi kết nối, thread pool, slot upload"),
+            ("StateManager","Theo dõi bitfield, mảnh verified/missing và tiến độ","Trạng thái trong RAM; cập nhật tiến độ xuống DB cục bộ"),
+            ("FileManager","Tạo tệp đích, đọc và ghi từng mảnh đúng vị trí","Tệp dữ liệu; offset = chunk_index × chunk_size"),
+            ("Database","Lưu thông tin tệp và trạng thái mảnh; truy vấn có tham số","SQLite riêng của peer, chế độ WAL"),
+            ("CLI / TUI / Web UI","Tiếp nhận thao tác và hiển thị snapshot tiến độ, peer, log","Cùng sử dụng PeerNode; không giữ logic tải riêng"),
+        ],widths=[.20,.43,.37]),
+        caption("Bảng 7.2 — Các mô-đun của PeerApp và phạm vi trạng thái chúng sở hữu."),
+        peer_flow_diagram(465,125),
+        caption("Hình 7.2 — Luồng xử lý một mảnh: khám phá, tải và xác minh, ghi dữ liệu, cập nhật trạng thái, cho phép phục vụ lại."),
+        rich("DownloadManager và UploadServer hoạt động đồng thời nên peer có thể tải từ nguồn A trong lúc phục vụ mảnh đã xác minh cho peer B. Sự đồng thời nằm ở các kết nối và worker; một phiên tải có thể lấy nhiều mảnh từ nhiều nguồn. Số nguồn, độ sâu pipeline và số slot upload đều bị giới hạn. Trong hiện thực hiện tại, PeerNode chỉ duy trì một tác vụ download đang hoạt động tại một thời điểm."),
+        rich("CommonLib cung cấp Metadata, SHA256, Protocol, Logger và lớp bọc socket cho cả hai chương trình. Đây là thư viện liên kết vào từng tiến trình: việc dùng chung mã không tạo bộ nhớ chung giữa các node. Mutex của StateManager hoặc SQLite chỉ đồng bộ các luồng trong peer sở hữu chúng, không thay thế giao tiếp HTTP/TCP giữa các peer."),
+        h2("7.4. Luồng hoạt động từ chia sẻ đến hoàn tất"),
+        numbered([
+            "Seeder đọc tệp, tính SHA-256 từng mảnh và toàn tệp, rồi sinh metadata JSON. Metadata được chuyển tới bên tải qua kênh riêng; bản thân nó không chứa nội dung tệp.",
+            "Seeder đăng ký tệp với UploadServer, đánh dấu các mảnh sẵn có và announce lên tracker bằng File ID, Peer ID, endpoint và bitfield.",
+            "Leecher nạp cùng metadata, chuẩn bị tệp đích và trạng thái cục bộ, công bố các mảnh đã có, rồi yêu cầu danh sách nguồn từ tracker.",
+            "Leecher mở các kết nối TCP trực tiếp tới nguồn, thực hiện HANDSHAKE/BITFIELD và xin slot phục vụ. Scheduler phân công các mảnh còn thiếu cho những nguồn thích hợp; các mảnh khác nhau có thể được nhận đồng thời.",
+            "Mỗi PIECE được kiểm tra index, kích thước và hash trước khi ghi theo offset. Sau khi mảnh hợp lệ được lưu, trạng thái verified được cập nhật; callback announce có throttle giúp peer khác biết thêm nguồn mảnh. UploadServer chỉ phục vụ phần đã có và hợp lệ.",
+            "Khi đủ mảnh, peer băm lại toàn tệp để đối chiếu file_hash. Nếu đúng, tệp được công nhận hoàn tất; peer có thể tiếp tục ở lại swarm để seed. Nếu mảnh sai hoặc nguồn lỗi, mảnh chưa hoàn tất được đưa về hàng chờ trong giới hạn retry.",
+        ]),
+        rich("Ví dụ, L nhận mảnh i từ P1 và mảnh j từ P2 với i ≠ j. Mảnh j có thể tới trước i nhưng vẫn được ghi đúng vị trí nhờ chỉ số tuyệt đối. Sau khi j được xác minh, L có thể phục vụ j cho P3 ngay cả khi i và các mảnh khác còn thiếu. Tracker chỉ tham gia khâu tìm nguồn và cập nhật tình trạng; nó không nằm trên đường truyền nội dung của hai mảnh này."),
+        h2("7.5. Quyền sở hữu và lưu trữ trạng thái"),
+        table(["Trạng thái","Nơi lưu / chủ sở hữu","Tính chất và phục hồi"],[
+            ("Danh mục peer theo tệp","RAM của tracker","Snapshot khám phá có thể trễ; mất khi tracker restart, được tái tạo khi peer announce lại"),
+            ("Metadata và hash","Tệp JSON tại các peer","Dùng cùng bố cục mảnh và hash tin cậy làm căn cứ xác minh; không chỉnh sửa cạnh tranh nội dung tệp"),
+            ("Bitfield và tiến độ","StateManager + SQLite riêng của từng peer","Mỗi peer công bố phần mình đã xác minh; khi resume cần đọc lại mảnh đã lưu để kiểm tra"),
+            ("Nội dung mảnh / tệp đích","Đĩa cục bộ của peer","Ghi theo offset; không mount chung thư mục để thay cho truyền mảnh qua mạng"),
+            ("Session và hàng chờ","RAM của DownloadManager/UploadServer","Không phải state bền; được thiết lập lại qua kết nối và tiến độ đã lưu sau restart"),
+        ],widths=[.23,.30,.47]),
+        caption("Bảng 7.3 — Ranh giới trạng thái phân tán và dữ liệu cục bộ."),
+        rich("Bitfield ở tracker là thông tin khám phá do peer công bố, còn bitfield cục bộ gắn với kết quả xác minh của chính peer đó. Thiết kế chấp nhận cập nhật khám phá có độ trễ nhưng không chấp nhận mảnh sai trở thành dữ liệu hoàn tất. Kiểm tra hash bảo đảm toàn vẹn theo metadata; nó không đồng nghĩa với xác thực peer hay đồng thuận phân tán. Mô hình nhất quán và cơ chế khóa được trình bày ở mục 10."),
+        h2("7.6. Ánh xạ triển khai"),
+        rich("Các tiến trình có thể bố trí trên nhiều máy LAN hoặc trong container. Ví dụ, máy A chứa tracker và peer P1; máy B chứa peer P2, P3. Dù hai peer cùng nằm trên máy B, chúng vẫn có cổng lắng nghe, Peer ID, DB và thư mục dữ liệu độc lập. Endpoint announce phải là IP/hostname mà các peer còn lại truy cập được; địa chỉ 127.0.0.1 không đại diện cho một peer trên máy khác."),
+        rich("Cấu hình Docker Compose trong deploy/ tạo một tracker và ba peer với hostname tracker, peer-seeder, peer-leecher-1, peer-leecher-2 trên mạng bridge riêng. Mỗi peer gắn một volume trạng thái riêng. TRACKER_URL trỏ tới tracker trong mạng này; PEER_HOST cung cấp hostname có thể phân giải giữa các container. Tên host trong mạng Compose không tự trở thành địa chỉ truy cập từ LAN bên ngoài."),
+        h2("7.7. Đánh đổi kiến trúc và phạm vi chịu lỗi"),
+        rich("Tracker tập trung làm cơ chế khám phá đơn giản và dễ quan sát nhưng tạo một điểm phụ thuộc: khi tracker không hoạt động, peer mới khó tìm nguồn và registry cần được xây lại sau restart. Các phiên TCP đã thiết lập có thể tiếp tục nếu nguồn đã biết còn sống và giữ đủ mảnh. Vì vậy tách đường dữ liệu khỏi tracker giúp giảm ảnh hưởng lỗi, nhưng không tạo khả năng sẵn sàng cao cho toàn hệ thống."),
+        rich("Khi một nguồn rời mạng, việc chuyển tải chỉ thành công nếu các nguồn còn lại có đủ những mảnh đang thiếu và còn trong ngân sách thử lại. Hệ thống không tự tái tạo một mảnh khi mọi bản sao của mảnh đó đã mất. Kiến trúc hiện tại cũng chưa có tracker sao chép, DHT hoặc NAT traversal tự động; triển khai qua WAN cần endpoint TCP truy cập được. Cơ chế phát hiện lỗi, retry và checkpoint được phân tích tiếp ở mục 11; giới hạn bảo mật ở mục 12."),
     ]
+
 
 
 def section_8_components():
@@ -450,11 +330,12 @@ def section_8_components():
         ),
         rich(
             "**Định danh tệp (File ID) chính là `file_hash`** — mã băm SHA-256 của toàn bộ nội dung. Lựa chọn này "
-            "mang lại ba tính chất: định danh duy nhất mà không cần cấp phát, hai tệp cùng nội dung tự động cùng "
+            "mang lại ba tính chất: định danh theo nội dung không cần máy chủ cấp phát, hai tệp cùng nội dung tự động cùng "
             "định danh (chống trùng lặp), và bất kỳ ai cầm siêu dữ liệu đều xác minh được cả từng mảnh lẫn toàn tệp. "
-            "`chunk_hashs` có đúng `num_chunks` phần tử, phần tử cuối có thể ngắn hơn `chunk_size` nếu kích thước tệp "
+            "`chunk_hashs` có đúng `num_chunks` phần tử khi sinh từ tệp hợp lệ; mảnh dữ liệu cuối có thể ngắn hơn `chunk_size` nếu kích thước tệp "
             "không chia hết."
         ),
+        rich("**Phạm vi tương thích.** Đây là giao thức do nhóm thiết kế lấy ý tưởng từ BitTorrent [3]. Metadata JSON dùng SHA-256 và File ID là hash nội dung; BEP 3 dùng bencoding và info-hash của từ điển info. Vì vậy không thể đưa metadata của đồ án vào qBittorrent thật và kỳ vọng tải được. Với metadata của đồ án, N = ceil(file_size/chunk_size); offset mảnh i = i × chunk_size, độ dài mảnh cuối là phần còn lại."),
         h2("8.2. Giao thức Peer ↔ Tracker (HTTP + JSON)"),
         table(
             ["Phương thức", "Đường dẫn", "Nội dung", "Phản hồi"],
@@ -471,15 +352,15 @@ def section_8_components():
             "Tracker kiểm tra nghiêm ngặt trường vào: `peer_id` và `file_id` phải là chuỗi, `bitfield` phải là mảng "
             "boolean, `port` phải nằm trong khoảng 1–65535. Khi một peer announce lại cùng `file_id` với cùng "
             "`peer_id`, bản ghi được cập nhật (không nhân đôi). Địa chỉ IP được lấy theo thứ tự ưu tiên: "
-            "`X-Forwarded-For` → `X-Real-IP` → địa chỉ kết nối, và tracker từ chối các giá trị cục bộ "
-            "(`127.0.0.1`, `0.0.0.0`) khi phía gọi là mạng ngoài, nhằm tránh công bố địa chỉ không kết nối được."
+            "`X-Forwarded-For` → `X-Real-IP` → địa chỉ kết nối khi cần suy ra IP. Tracker thay địa chỉ cục bộ "
+            "(`127.0.0.1`, `0.0.0.0`) bằng IP quan sát được khi phía gọi là mạng ngoài. Các header proxy hiện chưa được xác minh nguồn tin cậy; đây không phải cơ chế chống giả mạo."
         ),
         h2("8.3. Giao thức Peer ↔ Peer (TCP thô, khung tin nhị phân)"),
         rich(
             "TCP là một dòng byte liên tục, không phải chuỗi thông điệp: một lần `recv()` có thể trả về nửa khung "
             "hoặc hai khung dính liền. Vì vậy mọi khung đều có tiền tố độ dài và việc đọc dùng `recv_exact` lặp "
             "đến khi đủ số byte, gửi dùng `send_exact`. Mọi số nguyên nhiều byte đều ở **network byte order** "
-            "(`htonl`/`ntohs`)."
+            "(`htonl`/`ntohl` với uint32; `htons`/`ntohs` với uint16)."
         ),
         frame_diagram(430, 58),
         caption("Hình 8.1 — Cấu trúc khung tin: 4 byte độ dài, 1 byte mã loại, payload."),
@@ -490,7 +371,7 @@ def section_8_components():
                 ("0x01", "BITFIELD", "1 byte/mảnh (0/1)", "Peer gửi biết những mảnh mình đang giữ"),
                 ("0x02", "REQUEST", "`uint32 index`", "Yêu cầu một mảnh"),
                 ("0x03", "PIECE", "`uint32 index · data`", "Trả nội dung mảnh"),
-                ("0x04", "CANCEL", "`uint32 index`", "Hủy yêu cầu (pipeline đầy)"),
+                ("0x04", "CANCEL", "`uint32 index`", "Khai báo mã hủy; không phải luồng tải chính"),
                 ("0x05", "KEEPALIVE", "rỗng", "Giữ kết nối sống"),
                 ("0x06", "INTERESTED", "rỗng", "Xin một slot tải lên"),
                 ("0x07", "NOT_INTERESTED", "rỗng", "Trả lại slot"),
@@ -502,12 +383,13 @@ def section_8_components():
         caption("Bảng 8.2 — Mười loại khung của giao thức peer-to-peer."),
         spacer(2),
         rich(
-            "Giới hạn cứng: khung tối đa **8 MB** (`MAX_WIRE_MESSAGE_SIZE`), `peer_id` và `file_id` tối đa **128 byte**. "
+            "Giới hạn cứng: trường length tối đa **8 MiB** (`MAX_WIRE_MESSAGE_SIZE`, không tính 4 byte prefix), `peer_id` và `file_id` trong handshake tối đa **128 byte**. "
             "Khung vượt giới hạn bị đóng kết nối **trước khi** cấp phát bộ nhớ, nên một peer độc hại không thể ép "
             "đối phương cấp phát 4 GB chỉ bằng một tiền tố độ dài."
         ),
+        rich("Với frame có body, length = 1 + payload.size(), không tính prefix 4 byte. REQUEST mang index uint32; PIECE mang index uint32 và dữ liệu, nên chunk_size còn phải phù hợp trần frame. Decoder cũng chấp nhận length = 0 làm keepalive không có byte loại. Bitfield hiện dùng một byte cho một mảnh trên wire, không phải bit-packing như giao thức BitTorrent đầy đủ."),
         h2("8.4. Trình tự một phiên tải"),
-        sequence_diagram(430, 185),
+        sequence_diagram(430, 215),
         caption("Hình 8.2 — Trình tự bắt tay và trao đổi mảnh giữa leecher, tracker và seeder."),
         rich(
             "Sau khi nhận `BITFIELD`, leecher gửi `INTERESTED`; seeder cấp một slot và trả `UNCHOKE`. Leecher sau đó "
@@ -519,52 +401,24 @@ def section_8_components():
 
 
 def section_9_discovery():
-    return [
-        h1("9. Định danh và khám phá"),
-        h2("9.1. Định danh peer"),
-        rich(
-            "Mỗi tiến trình peer sinh một Peer ID duy nhất khi khởi động, có dạng `peer-<port>-<16 byte hex>`, từ "
-            "ba nguồn ngẫu nhiên ghép lại (`random_device`, đồng hồ steady, PID). Việc ghép PID là cần thiết vì "
-            "trong demo nhiều peer cùng chạy trên một máy và cùng xin cổng `0` (OS cấp cổng bất kỳ): nếu chỉ dựa "
-            "vào cổng yêu cầu, hai peer sẽ trùng định danh, và `DownloadManager` — vốn bỏ qua peer trùng ID của "
-            "chính mình — sẽ không thấy phần còn lại của swarm."
-        ),
-        rich(
-            "Peer ID **không** được lưu bền: mỗi lần chạy là một danh tính mới. Đây là lựa chọn có chủ đích cho phạm "
-            "vi đồ án, và nó an toàn về mặt chức năng vì tracker dọn peer quá hạn sau 45 s; đổi lại, lịch sử peer "
-            "trong bảng `peer_history` không gắn được với một danh tính ổn định giữa các lần chạy. Mục 16 ghi nhận "
-            "đây là hướng cải tiến."
-        ),
-        h2("9.2. Định danh tệp"),
-        rich(
-            "File ID = SHA-256 của toàn bộ nội dung, dài 64 ký tự hex. Mọi bảng trong SQLite và mọi khóa trên "
-            "tracker đều dùng chuỗi này. Nhờ tính chất của hàm băm, hai peer độc lập cùng chia sẻ một tệp sẽ tự "
-            "động hội tụ vào cùng một swarm mà không cần đăng ký tên."
-        ),
-        h2("9.3. Đăng ký và khám phá"),
-        numbered(
-            [
-                "Seeder sinh `.torrent.json`; băm từng mảnh theo luồng, không nạp cả tệp vào RAM.",
-                "Seeder khởi động `UploadServer` trên cổng của nó, ghi trạng thái `verified` cho toàn bộ mảnh.",
-                "Seeder announce lên tracker: `file_id`, `bitfield` toàn `true`, `ip`, `port`.",
-                "Leecher nhận `.torrent.json` ngoài kênh P2P, gọi `GET /peers?file_id=…` và nhận danh sách peer.",
-                "Leecher kết nối TCP tới từng peer, bắt tay, nhận `BITFIELD` thực tế của peer đó.",
-            ]
-        ),
-        h2("9.4. Heartbeat và dọn peer quá hạn"),
-        rich(
-            "Peer gửi announce lại mỗi **15 giây** (vòng lặp ngủ 30 × 500 ms). Tracker chạy một luồng dọn riêng, "
-            "thức mỗi **10 giây** và xóa mọi bản ghi có `last_seen` cũ hơn **45 giây**. Hai chu kỳ này được chọn "
-            "sao cho một peer chết được phát hiện sau tối đa 45 + 10 = 55 giây trong trường hợp xấu nhất, trong khi "
-            "một lần announce bị trễ không làm peer bị loại oan. Kịch bản demo 7 đo được thời gian loại thực tế là "
-            "**50 giây**."
-        ),
-        rich(
-            "Cơ chế này là ví dụ điển hình của đánh đổi trong hệ phân tán: chu kỳ càng ngắn thì phát hiện lỗi càng "
-            "nhanh nhưng tải lên tracker càng lớn. Với 15 s/45 s, một tracker nhỏ có thể phục vụ hàng trăm peer bằng "
-            "băng thông không đáng kể, và các peer đang tải giữa nhau không hề bị ảnh hưởng khi tracker chậm."
-        ),
+    return [h1("9. Định danh và khám phá"),
+        h2("9.1. Định danh peer và tệp"),
+        rich("Peer ID được sinh khi khởi động, có dạng `peer-<port>-<16 ký tự hex>`, kết hợp nguồn ngẫu nhiên, đồng hồ steady và PID. ID giúp phân biệt peer trong registry và tránh kết nối lại chính mình; nó có xác suất trùng rất thấp trong quy mô đồ án nhưng không phải chứng thực mật mã. Peer ID chưa lưu bền nên thay đổi sau restart."),
+        rich("File ID là `file_hash`: SHA-256 toàn bộ nội dung, biểu diễn bằng 64 ký tự hex. Để các peer thuộc cùng swarm sử dụng cùng bố cục mảnh, các peer sử dụng **cùng một metadata**. Chỉ có cùng hash tệp nhưng khác chunk_size/danh sách hash chưa đủ để bảo đảm hai peer tương thích giao thức mảnh; bố cục chưa được đưa vào File ID."),
+        h2("9.2. Đăng ký và tra cứu"),
+        numbered(["Seeder sinh metadata và khởi động UploadServer; announce Peer ID, File ID, IP, port và bitfield.",
+                  "Leecher nhận riêng metadata, đăng ký bitfield ban đầu rồi gọi GET /peers theo File ID.",
+                  "Danh sách trả về là gợi ý; leecher kiểm tra địa chỉ, bỏ chính mình và kết nối trực tiếp tới peer.",
+                  "HANDSHAKE thống nhất File ID; BITFIELD cho biết trạng thái tại phiên; chỉ mảnh có sẵn mới được yêu cầu.",
+                  "Sau mỗi mảnh đã xác minh, callback có thể announce với ngưỡng chống gửi dồn 750 ms; heartbeat định kỳ tiếp tục cập nhật trạng thái."]),
+        h2("9.3. Liveness và giới hạn của phát hiện lỗi"),
+        rich("Peer gửi heartbeat khoảng 15 giây; tracker quét registry mỗi 10 giây và loại bản ghi có tuổi lớn hơn 45 giây theo đồng hồ steady. Khi mạng và lịch CPU bình thường, thời điểm loại thường nằm khoảng 45–55 giây tính từ **announce cuối**, không phải luôn tính từ lúc kill. Nếu kill sau một heartbeat đã lâu thì thời gian chờ tính từ kill ngắn hơn. Không thể dùng riêng timeout để phân biệt chắc chắn peer chết với mạng bị chia cắt."),
+        rich("Phía tải phát hiện lỗi qua EOF/lỗi socket hoặc timeout, độc lập với lease trên tracker: không cần chờ tracker loại nguồn mới chuyển tải. Khi nguồn còn đủ dữ liệu, phiên tiếp tục; nếu các mảnh còn thiếu không còn nguồn khả dụng, scheduler có ngân sách khám phá hữu hạn và có thể kết thúc lỗi."),
+        h2("9.4. Địa chỉ và chi phí khám phá"),
+        rich("Trong LAN phải công bố IP mà máy khác truy cập được bằng `--announce-ip`; 127.0.0.1 chỉ có ý nghĩa trên cùng máy. Với container, `PEER_HOST` là hostname trong mạng Compose. Kết nối WAN cần cấu hình định tuyến/NAT phù hợp; đồ án chưa có NAT traversal tự động."),
+        rich("Mỗi announce chứa bitfield O(N) với N mảnh; nhiều peer và nhiều truy vấn danh sách sẽ tăng tải tracker. Vì vậy không suy luận khả năng phục vụ hàng trăm hay hàng nghìn peer từ phép đo 1–3 nguồn. Khi tracker restart, registry trong RAM mất; peer phải announce lại để tái tạo trạng thái."),
     ]
+
 
 
 def section_10_concurrency():
@@ -579,7 +433,7 @@ def section_10_concurrency():
                 ("SQLite bị nhiều luồng truy cập", "Khóa dài, lỗi `database is locked`", "WAL + mutex cấp ứng dụng + prepared statement"),
                 ("Quá nhiều kết nối tới một seeder", "Cạn kiệt tài nguyên, mọi peer cùng chậm", "Giới hạn slot tải lên, `CHOKE`, hàng đợi có giới hạn"),
                 ("Tracker đọc/ghi registry đồng thời", "Bản ghi mất, vector bị hỏng", "Một mutex cho toàn bộ thao tác registry"),
-                ("Mảnh được yêu cầu lại khi đang bay", "Hai luồng cùng ghi một offset", "In-flight tracking; chỉ requeue sau timeout"),
+                ("Mảnh được yêu cầu lại khi đang bay", "Hai luồng cùng ghi một offset", "In-flight tracking; thu hồi và requeue sau lỗi hoặc timeout"),
             ],
             widths=[0.26, 0.32, 0.42],
         ),
@@ -588,15 +442,13 @@ def section_10_concurrency():
         h2("10.2. Mô hình nhất quán"),
         rich(
             "Hệ thống áp dụng **nhất quán cuối cùng** cho metadata của swarm: tracker và các peer khác chỉ biết một "
-            "peer vừa có thêm mảnh sau chu kỳ announce kế tiếp (tối đa 15 s). Ngược lại, với **nội dung**, hệ thống "
-            "áp dụng quy tắc mạnh hơn: một mảnh chỉ được ghi nhận khi mã băm khớp, và toàn tệp chỉ được coi là hoàn "
+            "peer vừa có thêm mảnh sau announce định kỳ hoặc callback có throttle; lỗi mạng có thể làm thông tin trễ lâu hơn. Với **nội dung**, hệ thống "
+            "áp dụng bất biến toàn vẹn: một mảnh chỉ được ghi nhận khi mã băm khớp metadata tin cậy, và toàn tệp chỉ được coi là hoàn "
             "tất khi mã băm tổng khớp. Nói cách khác, trạng thái “ai giữ gì” có thể trễ, nhưng trạng thái “tôi giữ "
-            "gì” luôn đúng."
+            "gì” phải được xác minh lại khi phục hồi. Kiểm tra hash là thuộc tính toàn vẹn, không phải bằng chứng linearizability hay đồng thuận phân tán."
         ),
         rich(
-            "Cách diễn đạt chính xác: bitfield là **CRDT không cần hợp nhất** ở mức mỗi peer — mỗi peer tự sở hữu "
-            "bitfield của mình và chỉ công bố nó; không có hai bên nào cùng ghi một bitfield. Nhờ vậy không cần "
-            "vector clock hay Lamport clock: không tồn tại tình huống hai bản ghi xung đột cần phân xử."
+            "Bitfield có **một chủ sở hữu** là peer tương ứng. Tracker cập nhật snapshot theo announce đến sau; chưa có version hoặc phép hợp nhất để gọi đây là CRDT. Announce trễ có thể tạm thay snapshot mới bằng snapshot cũ; heartbeat thành công tiếp theo giúp cập nhật lại. Lamport/vector clock chưa cần cho chỉnh sửa nội dung vì tệp là bất biến, nhưng version/epoch là hướng cải thiện metadata liveness."
         ),
         h2("10.3. Chọn mảnh: random-first rồi rarest-first"),
         rich(
@@ -625,15 +477,19 @@ for (const auto& entry : availability) rarest = min(rarest, entry.second);
         ),
         h2("10.4. Pipeline và giới hạn tài nguyên"),
         rich(
-            "Mỗi phiên giữ tối đa `pipeline_depth` yêu cầu chưa được trả lời (mặc định 3) — đủ để che độ trễ khứ "
+            "Mỗi phiên giữ tối đa `pipeline_depth` yêu cầu chưa được trả lời (mặc định 3) — nhằm che một phần độ trễ khứ "
             "hồi mà không dồn quá nhiều mảnh vào một kết nối. Số phiên song song bị giới hạn bởi "
             "`max_active_downloads` (mặc định 5), và phía phục vụ giới hạn `max_active_uploads` (mặc định 5) kèm "
             "hàng đợi 64 kết nối. Vượt hàng đợi, kết nối bị đóng ngay thay vì làm chậm cả seeder."
         ),
         rich(
-            "**Chống đói (starvation).** Seeder giữ slot tối đa `choke_wait_ms` = 2000 ms cho một client xin slot; "
+            "**Giới hạn thời gian chờ slot.** Seeder chờ cấp slot tối đa `choke_wait_ms` = 2000 ms cho một client; "
             "nếu không có, nó trả `CHOKE`. Giá trị này phải nhỏ hơn `io_timeout_ms` của phía tải (4000 ms), nếu "
-            "không một seeder khỏe nhưng đang bận sẽ bị phía tải coi là đã chết và tiêu tốn ngân sách lỗi — chi "
-            "tiết này được ghi chú ngay trong mã nguồn và là một bài học thực tế khi tinh chỉnh timeout."
+            "không một seeder khỏe nhưng đang bận sẽ bị phía tải coi là đã chết và tiêu tốn ngân sách lỗi — "
+            "cần phân biệt thời gian chờ slot với thời gian giữ slot. Cơ chế này chưa bảo đảm công bằng hoặc không đói cho mọi peer."
         ),
+        h2("10.5. Trùng lặp, sai thứ tự và tiêu chí trạng thái cuối"),
+        rich("TCP giữ thứ tự byte trong một kết nối; nhiều kết nối có thể hoàn tất mảnh theo thứ tự khác nhau. Index mảnh xác định vị trí ghi nên không cần sắp lại toàn bộ luồng tải theo thứ tự đến. Phản hồi phải thuộc tập in-flight của phiên, đúng kích thước và đúng hash; phản hồi ngoài yêu cầu bị xem là lỗi giao thức, không được dùng để tăng tiến độ."),
+        rich("Giao thức không định nghĩa ACK riêng cho commit mảnh: PIECE là phản hồi REQUEST, còn verified là trạng thái cục bộ sau kiểm tra và ghi. TCP ACK không chứng minh mảnh đã lưu bền trong DB. Khi mất kết nối, yêu cầu có thể được phát lại; ghi cùng nội dung đúng vào cùng offset có tính lũy đẳng, nhưng không tuyên bố truyền đúng-một-lần trên mạng."),
+        rich("Các bất biến cần kiểm tra: một mảnh chỉ do một worker claim trong cùng scheduler; bitfield true chỉ dành cho nội dung đã xác minh; mảnh sai không được tính hoàn thành; số kết nối/slot không vượt giới hạn; tệp cuối phải có SHA-256 đúng metadata. Bằng chứng cuối của phiên gồm hash, tiến độ đủ và dấu vết nguồn đóng góp; không chỉ là thông báo giao diện 100%."),
     ]
