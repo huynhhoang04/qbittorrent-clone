@@ -74,7 +74,8 @@ struct Tui::impl {
     void append_log(log_level level, const string& message) {
         lock_guard<mutex> lock(log_mtx);
         ostringstream line;
-        line << "[" << log_level_name(level) << "] " << message;
+        line << "[" << log_timestamp() << "] [" << log_level_name(level) << "] "
+             << message;
         logs.push_back(line.str());
         while (logs.size() > 200) {
             logs.pop_front();

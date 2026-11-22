@@ -32,3 +32,8 @@ class Logger {
 };
 
 const char* log_level_name(log_level level);
+
+// Wall-clock stamp for a log line: "2026-11-22 14:03:07.412". The course
+// specification requires logs to carry timestamps, and every renderer (stdout,
+// TUI, Web) uses this one function so the formats cannot drift apart.
+string log_timestamp();

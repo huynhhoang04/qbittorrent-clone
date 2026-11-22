@@ -480,7 +480,10 @@ void DownloadManager::release_chunk(int chunk_index, const string& peer_id, bool
     }
 
     if (failed) {
-        record_failure("", "chunk " + to_string(chunk_index) + " exhausted its retry budget");
+        // Naming the last holder matters when diagnosing a stall: the chunk ran
+        // out of attempts while being requested from this peer.
+        record_failure(peer_id, "chunk " + to_string(chunk_index) +
+                                    " exhausted its retry budget");
     }
     cv.notify_all();
 }

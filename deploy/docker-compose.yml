@@ -1,3 +1,13 @@
+# Four independent nodes on their own bridge network: one tracker and three
+# peers. Each peer publishes its web dashboard so files can be added without
+# copying them into the container first.
+#
+#   docker compose up --build
+#   open http://localhost:8081  (seeder)   http://localhost:8082  (leecher 1)
+#   open http://localhost:8083  (leecher 2)
+#
+# Upload a file on the seeder's dashboard, download its .torrent.json there,
+# then upload that .torrent.json on the two leechers' dashboards.
 services:
   tracker:
     build:
@@ -6,6 +16,8 @@ services:
     container_name: p2p_tracker
     ports:
       - "8080:8080"
+    environment:
+      - TRACKER_PORT=8080
     networks:
       - p2p_network
     hostname: tracker
@@ -16,13 +28,21 @@ services:
       dockerfile: deploy/Dockerfile.peer
     container_name: p2p_peer_seeder
     environment:
+      # PEER_HOST must be the name other containers resolve, not the address
+      # the tracker observes, so it is set explicitly per node.
       - TRACKER_URL=http://tracker:8080
       - PEER_HOST=peer-seeder
+      # The volume is mounted at /app/data and PeerApp's own default is
+      # ./data/peer, so without this the state would land outside the volume.
+      - PEER_DATA_DIR=/app/data
     volumes:
       - ../data/seeder:/app/data
+    ports:
+      - "8081:8081"
     networks:
       - p2p_network
     hostname: peer-seeder
+    command: ["./PeerApp", "--webui", "--webui-port", "8081"]
     depends_on:
       - tracker
 
@@ -34,11 +54,15 @@ services:
     environment:
       - TRACKER_URL=http://tracker:8080
       - PEER_HOST=peer-leecher-1
+      - PEER_DATA_DIR=/app/data
     volumes:
       - ../data/leecher1:/app/data
+    ports:
+      - "8082:8081"
     networks:
       - p2p_network
     hostname: peer-leecher-1
+    command: ["./PeerApp", "--webui", "--webui-port", "8081"]
     depends_on:
       - tracker
 
@@ -50,11 +74,15 @@ services:
     environment:
       - TRACKER_URL=http://tracker:8080
       - PEER_HOST=peer-leecher-2
+      - PEER_DATA_DIR=/app/data
     volumes:
       - ../data/leecher2:/app/data
+    ports:
+      - "8083:8081"
     networks:
       - p2p_network
     hostname: peer-leecher-2
+    command: ["./PeerApp", "--webui", "--webui-port", "8081"]
     depends_on:
       - tracker
 

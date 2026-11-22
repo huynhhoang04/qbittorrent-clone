@@ -16,7 +16,58 @@ using json = nlohmann::json;
 
 namespace {
 
+// A browser-supplied name is written straight to disk, so it must not be able to
+// escape the directory it is joined to. ".." plus a separator would walk out of
+// the data dir, and an absolute path would ignore it entirely, so only the last
+// component is kept and any relative path is refused outright.
+bool safe_file_name(const string& raw, string& out) {
+    if (raw.empty()) {
+        return false;
+    }
+    // Reject Windows separators too: the peer also builds on MinGW.
+    if (raw.find('/') != string::npos || raw.find('\\') != string::npos) {
+        return false;
+    }
+    if (raw == "." || raw == "..") {
+        return false;
+    }
+    // Control characters and a NUL would truncate or confuse the path.
+    for (char ch : raw) {
+        if (static_cast<unsigned char>(ch) < 0x20) {
+            return false;
+        }
+    }
+    out = raw;
+    return true;
+}
 
+// Resolves `raw` (absolute or relative) and accepts it only if it lands inside
+// `base`. The dashboard lets the operator point at a file to seed or a torrent
+// to download; without this, any path the peer process can read would become
+// readable by the whole swarm.
+bool resolve_within(const string& base, const string& raw, string& out) {
+    error_code ec;
+    const auto root = filesystem::weakly_canonical(base, ec);
+    if (ec) {
+        return false;
+    }
+    filesystem::path candidate(raw);
+    if (candidate.is_relative()) {
+        candidate = root / candidate;
+    }
+    const auto resolved = filesystem::weakly_canonical(candidate, ec);
+    if (ec) {
+        return false;
+    }
+    const auto relative = resolved.lexically_relative(root);
+    // An empty relative path means the two are equal; a leading ".." means the
+    // candidate escaped the root in any direction.
+    if (relative.empty() || *relative.begin() == "..") {
+        return false;
+    }
+    out = resolved.string();
+    return true;
+}
 
 const char* INDEX_HTML = R"rawhtml(<!DOCTYPE html>
 <html lang="en">
@@ -682,7 +733,11 @@ void WebUiServer::setup_routes() {
             if (!body.contains("file_path") || !body["file_path"].is_string()) {
                 return crow::response(400, "application/json", "{\"error\":\"Missing file_path field\"}");
             }
-            string path = body["file_path"].get<string>();
+            string path;
+            if (!resolve_within(node.get_data_dir(), body["file_path"].get<string>(), path)) {
+                return crow::response(400, "application/json",
+                                      "{\"error\":\"file_path must point to a file inside the peer data directory\"}");
+            }
             size_t chunk_size = 256 * 1024;
             if (body.contains("chunk_size") && body["chunk_size"].is_number()) {
                 chunk_size = body["chunk_size"].get<size_t>();
@@ -703,7 +758,11 @@ void WebUiServer::setup_routes() {
         Logger log;
         try {
             const char* fname_param = req.url_params.get("filename");
-            string filename = (fname_param && strlen(fname_param) > 0) ? fname_param : "uploaded_file.bin";
+            string filename;
+            if (!safe_file_name(fname_param ? fname_param : "", filename)) {
+                return crow::response(400, "application/json",
+                                      "{\"error\":\"Invalid filename: must be a plain file name with no path separators\"}");
+            }
             const char* chunk_param = req.url_params.get("chunk_size");
             size_t chunk_size = (chunk_param && strlen(chunk_param) > 0) ? stoull(chunk_param) : (256 * 1024);
 
@@ -737,7 +796,11 @@ void WebUiServer::setup_routes() {
             if (!body.contains("torrent_path") || !body["torrent_path"].is_string()) {
                 return crow::response(400, "application/json", "{\"error\":\"Missing torrent_path field\"}");
             }
-            string torrent_path = body["torrent_path"].get<string>();
+            string torrent_path;
+            if (!resolve_within(node.get_data_dir(), body["torrent_path"].get<string>(), torrent_path)) {
+                return crow::response(400, "application/json",
+                                      "{\"error\":\"torrent_path must point to a file inside the peer data directory\"}");
+            }
             string output_dir;
             if (body.contains("output_dir") && body["output_dir"].is_string()) {
                 output_dir = body["output_dir"].get<string>();
@@ -758,9 +821,14 @@ void WebUiServer::setup_routes() {
         Logger log;
         try {
             json torrent_json = json::parse(req.body);
-            string file_name = "torrent";
+            string file_name;
             if (torrent_json.contains("file_name") && torrent_json["file_name"].is_string()) {
-                file_name = torrent_json["file_name"].get<string>();
+                if (!safe_file_name(torrent_json["file_name"].get<string>(), file_name)) {
+                    return crow::response(400, "application/json",
+                                          "{\"error\":\"Invalid file_name: must be a plain file name\"}");
+                }
+            } else {
+                file_name = "torrent";
             }
 
             string torrents_dir = node.get_data_dir() + "/torrents";
@@ -823,13 +891,13 @@ void WebUiServer::setup_routes() {
             string action = body.value("action", "");
             if (action == "pause") {
                 node.pause_download();
-                add_log("[INFO] WebUI: Paused download");
+                add_log("[" + log_timestamp() + "] [INFO] WebUI: Paused download");
             } else if (action == "resume") {
                 node.resume_download(true);
-                add_log("[INFO] WebUI: Resumed download");
+                add_log("[" + log_timestamp() + "] [INFO] WebUI: Resumed download");
             } else if (action == "stop") {
                 node.request_stop_download();
-                add_log("[WARN] WebUI: Requested stop");
+                add_log("[" + log_timestamp() + "] [WARN] WebUI: Requested stop");
             } else {
                 return crow::response(400, "application/json", "{\"error\":\"Unknown action\"}");
             }

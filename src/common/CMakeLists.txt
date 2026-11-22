@@ -14,7 +14,8 @@ add_library(CommonLib STATIC src/sha256.cpp
                             src/metadata.cpp
                             src/logger.cpp
                             src/net.cpp
-                            src/protocol.cpp)
+                            src/protocol.cpp
+                            src/env.cpp)
 
 target_link_libraries(CommonLib PUBLIC OpenSSL::Crypto)
 target_link_libraries(CommonLib PUBLIC Threads::Threads)

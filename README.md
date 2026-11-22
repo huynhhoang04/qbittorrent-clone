@@ -121,7 +121,7 @@ Peer tự dò IP card mạng ra ngoài. Có thể chỉ định thủ công:
 ## 4. Kiểm thử và đo hiệu năng
 
 ```bash
-# 42 bài unit + integration test (có tracker/peer thật trên loopback)
+# 48 bài unit + integration test (có tracker/peer thật trên loopback)
 ctest --test-dir build --output-on-failure
 
 # 7 kịch bản demo bắt buộc của đề bài — in 1 dòng PASS/FAIL cho mỗi kịch bản
@@ -173,28 +173,45 @@ docker compose up --build      # 1 tracker + 3 peer trên mạng bridge riêng
 
 `docker-compose.yml` tạo các hostname `tracker`, `peer-seeder`, `peer-leecher-1`,
 `peer-leecher-2`; mỗi peer có volume riêng nên trạng thái SQLite độc lập. Biến `PEER_HOST`
-được đặt theo hostname để peer công bố địa chỉ phân giải được trong mạng container.
+được đặt theo hostname để peer công bố địa chỉ phân giải được trong mạng container, và
+`PEER_DATA_DIR=/app/data` trỏ đúng vào volume đã mount.
+
+Dashboard của ba peer được publish ra `localhost:8081`, `localhost:8082`, `localhost:8083`.
+Quy trình demo: upload tệp trên dashboard của seeder → tải `.torrent.json` ở đó → upload
+file metadata đó trên dashboard của hai leecher.
+
+> Docker daemon phải đang chạy và máy cần mạng để tải Crow/Asio trong bước build.
 
 ---
 
 ## 7. Cấu hình
 
-Sao chép `.env.example` thành `.env` và chỉnh theo môi trường. Các biến **đang được
-chương trình đọc**: `TRACKER_URL`, `PEER_HOST`. Các biến còn lại trong `.env.example`
-là tài liệu tham chiếu cho giá trị mặc định và giá trị dùng trong `docker-compose.yml`;
-chúng chưa được đọc trực tiếp từ môi trường nên cần truyền bằng tham số dòng lệnh.
+Cả hai binary đều đọc `.env` trong thư mục làm việc lúc khởi động:
+
+```bash
+cp .env.example .env
+```
+
+Quy tắc ưu tiên: **tham số dòng lệnh > biến môi trường thật > `.env` > giá trị mặc định**.
+Một biến đã có trong môi trường tiến trình sẽ **không** bị `.env` ghi đè, nên cấu hình
+của container/CI luôn thắng tệp trong kho.
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
+| `TRACKER_PORT` | `8080` | Cổng TrackerApp lắng nghe |
 | `TRACKER_URL` | `http://localhost:8080` | URL tracker cho peer |
-| `PEER_HOST` | tự dò IP | Địa chỉ/hostname công bố với tracker |
-| `PEER_PORT` | `6881` | Cổng lắng nghe mặc định của peer |
+| `PEER_PORT` | `6881` | Cổng lắng nghe mặc định của peer (`0` = OS cấp) |
+| `PEER_HOST` | rỗng → tự dò IP | Địa chỉ/hostname công bố với tracker |
 | `PEER_DATA_DIR` | `./data/peer` | Thư mục dữ liệu/DB |
-| `WEBUI_PORT` | `8081` | Cổng dashboard |
+| `WEBUI_PORT` | `8081` | Cổng dashboard (vẫn cần cờ `--webui` để bật) |
 | `MAX_ACTIVE_DOWNLOADS` | `5` | Số nguồn tải song song |
 | `MAX_ACTIVE_UPLOADS` | `5` | Số slot phục vụ |
 | `PIPELINE_DEPTH` | `3` | Số REQUEST chưa trả lời mỗi kết nối |
 | `IO_TIMEOUT_MS` | `4000` | Timeout socket |
+
+Giá trị số đọc từ môi trường được kẹp vào khoảng hợp lệ (ví dụ cổng 1–65535, timeout
+≥ 500 ms); giá trị sai định dạng sẽ rơi về mặc định thay vì làm chương trình dừng.
+`.env` là tùy chọn — thiếu tệp không phải lỗi.
 
 Không commit `.env` — chỉ `.env.example` được đưa vào kho.
 
@@ -204,11 +221,11 @@ Không commit `.env` — chỉ `.env.example` được đưa vào kho.
 
 ```
 ├── src/
-│   ├── common/     protocol, sha256, metadata, logger, net  (CommonLib)
+│   ├── common/     protocol, sha256, metadata, logger, net, env  (CommonLib)
 │   ├── tracker/    peer_registry, tracker_server, main
 │   └── peer/       peer_node, download_manager, upload_server, state_manager,
 │                   database, file_manager, tracker_client, tui, web_ui, main
-├── tests/          11 tệp, 42 bài (functional / concurrency / fault / invalid-data)
+├── tests/          12 tệp, 48 bài (functional / concurrency / fault / invalid-data / env)
 ├── scripts/        demo_full, bench, inject_fault, start_peer, start_tracker, generate_test_file
 ├── deploy/         Dockerfile.peer, Dockerfile.tracker, docker-compose.yml
 ├── docs/           report.pdf, plan/ (kiến trúc, vấn đề phân tán, milestones)

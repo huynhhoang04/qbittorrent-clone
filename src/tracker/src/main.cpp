@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include <csignal>
+#include "env.hpp"
 #include "tracker_server.hpp"
 #include "logger.hpp"
 
@@ -15,7 +16,9 @@ void handle_signal(int signum) {
 
 int main(int argc, char* argv[]) {
     Logger log;
-    int port = 8080;
+    // `.env` is optional; the real environment always takes precedence.
+    appenv::load_file(".env");
+    int port = appenv::get_int("TRACKER_PORT", 8080, 1, 65535);
 
     for (int i = 1; i < argc; ++i) {
         string arg = argv[i];

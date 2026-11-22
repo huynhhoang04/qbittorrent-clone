@@ -12,6 +12,7 @@ add_executable(TestAll
     test_concurrent_download.cpp
     test_invalid_data.cpp
     test_fault_recovery.cpp
+    test_env.cpp
 )
 
 target_link_libraries(TestAll 
