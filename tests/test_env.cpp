@@ -88,6 +88,15 @@ TEST(EnvTest, IntegerReaderFallsBackAndClamps) {
     appenv::set_string("QBT_TEST_EPSILON", "not-a-number");
     EXPECT_EQ(appenv::get_int("QBT_TEST_EPSILON", 11, 0, 100), 11);
 
+    appenv::set_string("QBT_TEST_EPSILON", "42oops");
+    EXPECT_EQ(appenv::get_int("QBT_TEST_EPSILON", 11, 0, 100), 11);
+
+    appenv::set_string("QBT_TEST_EPSILON", "1.5");
+    EXPECT_EQ(appenv::get_int("QBT_TEST_EPSILON", 11, 0, 100), 11);
+
+    appenv::set_string("QBT_TEST_EPSILON", " 42 \t");
+    EXPECT_EQ(appenv::get_int("QBT_TEST_EPSILON", 11, 0, 100), 42);
+
     appenv::set_string("QBT_TEST_EPSILON", "500");
     EXPECT_EQ(appenv::get_int("QBT_TEST_EPSILON", 11, 0, 100), 100);
 

@@ -61,7 +61,12 @@ int get_int(const string& name, int fallback, int min_value, int max_value) {
         return fallback;
     }
     try {
-        const int parsed = stoi(value);
+        const string text = trim(value);
+        size_t consumed = 0;
+        const int parsed = stoi(text, &consumed);
+        if (consumed != text.size()) {
+            return fallback;
+        }
         if (parsed < min_value) {
             return min_value;
         }
