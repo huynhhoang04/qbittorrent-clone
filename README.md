@@ -147,8 +147,12 @@ Số liệu thô và phân tích đầy đủ ở mục 15 của báo cáo.
 
 ## 5. Bảy kịch bản demo tự động
 
-`scripts/demo_full.sh` dựng tracker và các peer thật, mỗi kịch bản dùng cổng và thư mục
-riêng, và chỉ kill những PID nó tự tạo.
+**Chọn bài theo câu hỏi của giảng viên:** xem [7 file demo chạy riêng](scripts/demo/README.md).
+Ví dụ: `bash scripts/demo_full.sh 4` chỉ chạy bài mất nguồn khi đang tải;
+không truyền số sẽ chạy cả 7 bài. Đầu mỗi bài in rõ thao tác và điều kiện PASS.
+
+Script tự dựng tracker và các peer thật trên localhost, dùng thư mục tạm,
+và chỉ dừng những PID nó tự tạo. Demo hai máy LAN dùng hướng dẫn riêng bên dưới.
 
 | # | Kịch bản | Điều kiện được coi là PASS |
 | --- | --- | --- |
