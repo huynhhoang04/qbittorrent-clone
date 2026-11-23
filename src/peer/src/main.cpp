@@ -62,6 +62,7 @@ namespace
         cout << "  --output-dir <dir>       Destination directory for downloads\n";
         cout << "  --chunk-size <bytes>     Chunk size used when generating metadata\n";
         cout << "  --max-downloads <n>      Maximum concurrent download connections (default 5)\n";
+        cout << "  --download-limit-mbps <n> Total download cap in MiB/s (default 0 = unlimited)\n";
         cout << "  --max-uploads <n>        Maximum concurrent upload slots (default 5)\n";
         cout << "  --pipeline-depth <n>     Requests kept in flight per peer (default 3)\n";
         cout << "  --io-timeout-ms <n>      Socket timeout in milliseconds (default 4000)\n";
@@ -100,6 +101,8 @@ int main(int argc, char *argv[])
     int pipeline_depth = appenv::get_int("PIPELINE_DEPTH", 3, 1, 1024);
     int io_timeout_ms = appenv::get_int("IO_TIMEOUT_MS", 4000, 500, 600000);
     parsed_options.max_active_downloads = max_downloads;
+    parsed_options.download_limit_mbps =
+        appenv::get_int("DOWNLOAD_LIMIT_MBPS", 0, 0, 1048576);
     parsed_options.max_active_uploads = max_uploads;
     parsed_options.pipeline_depth = pipeline_depth;
     parsed_options.io_timeout_ms = io_timeout_ms;
@@ -152,6 +155,21 @@ int main(int argc, char *argv[])
         else if (arg == "--max-downloads")
         {
             parsed_options.max_active_downloads = stoi(next_value("--max-downloads"));
+        }
+        else if (arg == "--download-limit-mbps")
+        {
+            const string value = next_value("--download-limit-mbps");
+            try {
+                size_t consumed = 0;
+                const int limit = stoi(value, &consumed);
+                if (consumed != value.size() || limit < 0 || limit > 1048576) {
+                    throw invalid_argument("invalid download limit");
+                }
+                parsed_options.download_limit_mbps = limit;
+            } catch (const exception&) {
+                cerr << "--download-limit-mbps requires an integer from 0 to 1048576 (MiB/s; 0 = unlimited)\n";
+                return 2;
+            }
         }
         else if (arg == "--max-uploads")
         {

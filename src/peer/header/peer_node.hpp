@@ -16,6 +16,7 @@ struct peer_node_options
 {
     string announce_ip; // Custom IP or hostname to announce to tracker
     int max_active_downloads = 5;
+    int download_limit_mbps = 0; // MiB/s across all sources; 0 = unlimited.
     int max_active_uploads = 5;
     int pipeline_depth = 3;
     int io_timeout_ms = 4000;

@@ -418,6 +418,83 @@ TEST(ConcurrentDownloadTest, TwoSeedersOneLeecher) {
     leecher.stop_upload();
 }
 
+TEST(ConcurrentDownloadTest, DownloadRateLimitIsSharedAcrossSources) {
+    const int tracker_port = testutil::reserve_port();
+    ASSERT_GT(tracker_port, 0);
+    TrackerFixture tracker(tracker_port);
+    ASSERT_TRUE(tracker.is_ready());
+    const string root = testutil::make_temp_dir("download_rate_limit");
+    const string source = root + "/source.bin";
+    constexpr size_t file_size = 4 * 1024 * 1024;
+    constexpr uint64_t rate = 2 * 1024 * 1024;
+    ASSERT_TRUE(testutil::write_pattern_file(source, file_size));
+    const torrent_info meta =
+        make_torrent(source, 64 * 1024, root + "/source.torrent.json", tracker.url());
+
+    // Disjoint bitfields force both connections to contribute. A separate
+    // 2 MiB/s allowance per source would finish in about one second.
+    SeederNode even;
+    SeederNode odd;
+    ASSERT_TRUE(even.start(root + "/even", "rate-even", tracker.url(), meta,
+                           source, parity_bitfield(meta.num_chunks, 0)));
+    ASSERT_TRUE(odd.start(root + "/odd", "rate-odd", tracker.url(), meta,
+                          source, parity_bitfield(meta.num_chunks, 1)));
+    LeecherNode leecher;
+    ASSERT_TRUE(leecher.start(root + "/leecher", "rate-leech", tracker.url(),
+                              meta, root + "/download.bin", 2, 4));
+    auto options = leecher.download->get_options();
+    options.max_download_bytes_per_second = rate;
+    leecher.download->set_options(options);
+
+    const auto started = chrono::steady_clock::now();
+    ASSERT_TRUE(leecher.run(tracker.url(), 15));
+    const double seconds = chrono::duration<double>(
+        chrono::steady_clock::now() - started).count();
+    EXPECT_GE(seconds, 1.95) << "the aggregate cap was bypassed";
+    EXPECT_EQ(testutil::file_sha256(leecher.output_path), meta.file_hash);
+    EXPECT_GT(even.upload->total_bytes_uploaded(), 0u);
+    EXPECT_GT(odd.upload->total_bytes_uploaded(), 0u);
+    std::cout << "RATE_LIMIT_PROBE sources=2 limit_mib_s=2 elapsed_s=" << seconds
+              << " measured_mib_s=" << file_size / seconds / (1024 * 1024) << "\n";
+}
+
+TEST(ConcurrentDownloadTest, StopInterruptsDownloadRateLimitWait) {
+    const int tracker_port = testutil::reserve_port();
+    ASSERT_GT(tracker_port, 0);
+    TrackerFixture tracker(tracker_port);
+    ASSERT_TRUE(tracker.is_ready());
+    const string root = testutil::make_temp_dir("download_rate_stop");
+    const string source = root + "/source.bin";
+    ASSERT_TRUE(testutil::write_pattern_file(source, 512 * 1024));
+    const torrent_info meta =
+        make_torrent(source, 256 * 1024, root + "/source.torrent.json", tracker.url());
+    SeederNode seeder;
+    ASSERT_TRUE(seeder.start(root + "/seeder", "slow-seed", tracker.url(), meta,
+                             source, full_bitfield(meta.num_chunks)));
+    LeecherNode leecher;
+    ASSERT_TRUE(leecher.start(root + "/leecher", "slow-leech", tracker.url(),
+                              meta, root + "/download.bin", 1, 1));
+    auto options = leecher.download->get_options();
+    options.max_download_bytes_per_second = 32 * 1024; // Eight seconds per chunk.
+    leecher.download->set_options(options);
+    auto future = std::async(std::launch::async, [&]() {
+        return leecher.download->start_download(meta, leecher.output_path);
+    });
+    const bool received = testutil::wait_until([&]() {
+        return seeder.upload->total_bytes_uploaded() >= meta.chunk_size;
+    }, 4000);
+    this_thread::sleep_for(chrono::milliseconds(100));
+    const auto stopped = chrono::steady_clock::now();
+    leecher.request_stop();
+    const bool ready = future.wait_for(chrono::seconds(2)) == std::future_status::ready;
+    EXPECT_TRUE(received);
+    EXPECT_TRUE(ready) << "stop did not interrupt the rate limiter";
+    EXPECT_FALSE(future.get());
+    EXPECT_LT(chrono::duration_cast<chrono::milliseconds>(
+        chrono::steady_clock::now() - stopped).count(), 1000);
+    EXPECT_EQ(leecher.download->get_stats().chunks_verified, 0u);
+}
+
 TEST(ConcurrentDownloadTest, UploadSlotsRespectLimitUnderConnectionSaturation) {
     const int tracker_port = testutil::reserve_port();
     ASSERT_GT(tracker_port, 0);

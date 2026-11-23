@@ -93,7 +93,8 @@ cmake --build build -j"$(nproc)"          # sinh build/src/peer/PeerApp, build/s
 ```
 
 Các tuỳ chọn hay dùng (`--help` để xem đủ): `--max-downloads`, `--max-uploads`,
-`--pipeline-depth`, `--io-timeout-ms`, `--chunk-delay-ms`, `--corrupt-chunks`,
+`--download-limit-mbps` (MiB/s, `0` = không giới hạn), `--pipeline-depth`,
+`--io-timeout-ms`, `--chunk-delay-ms`, `--corrupt-chunks`,
 `--announce-ip`, `--webui --webui-port`, `--tui`, `--exit-after-download`.
 
 ### 3.2. Web dashboard
@@ -121,7 +122,7 @@ Peer tự dò IP card mạng ra ngoài. Có thể chỉ định thủ công:
 ## 4. Kiểm thử và đo hiệu năng
 
 ```bash
-# 48 bài unit + integration test (có tracker/peer thật trên loopback)
+# 50 bài unit + integration test (có tracker/peer thật trên loopback)
 ctest --test-dir build --output-on-failure
 
 # 7 kịch bản demo tự động — in 1 dòng PASS/FAIL cho mỗi kịch bản
@@ -237,7 +238,7 @@ Không commit `.env` — chỉ `.env.example` được đưa vào kho.
 │   ├── tracker/    peer_registry, tracker_server, main
 │   └── peer/       peer_node, download_manager, upload_server, state_manager,
 │                   database, file_manager, tracker_client, tui, web_ui, main
-├── tests/          12 tệp, 48 bài (functional / concurrency / fault / invalid-data / env)
+├── tests/          12 tệp, 50 bài (functional / concurrency / fault / invalid-data / env)
 ├── scripts/        demo_full, bench, inject_fault, start_peer, start_tracker, generate_test_file
 ├── deploy/         Dockerfile.peer, Dockerfile.tracker, docker-compose.yml
 ├── docs/           report.pdf, plan/ (kiến trúc, vấn đề phân tán, milestones)

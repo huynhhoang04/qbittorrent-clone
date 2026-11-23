@@ -116,6 +116,7 @@ for number in "${selected[@]}"; do
   if [ "$number" = "${selected[0]}" ]; then
     printf 'Chạy trên localhost; tự mở và dọn các tiến trình demo.\n'
     printf 'Build: %s\nThư mục log: %s\n' "$build_dir" "$work"
+    printf 'Giới hạn tải mỗi peer: %s MiB/s (0 = không giới hạn).\n' "${QBT_DEMO_DOWNLOAD_MBPS:-10}"
     tracker_port="$(pick_port)" || { echo 'Không tìm được cổng trống.'; exit 1; }
     if ! start_tracker "$tracker_port" "$work/tracker.log"; then
       keep_logs=1

@@ -11,6 +11,7 @@
 using namespace std;
 
 struct download_options {
+    uint64_t max_download_bytes_per_second = 0; // Aggregate across sources; 0 = unlimited.
     int max_active_downloads = 5;
     int pipeline_depth = 3;
     int max_attempts_per_chunk = 12;
@@ -114,6 +115,7 @@ class DownloadManager {
         bool stop_requested() const;
         bool is_paused_now() const;
         void wait_for_work(int milliseconds);
+        bool wait_for_download_budget(size_t bytes);
 
         void record_failure(const string& peer_id, const string& message);
 
@@ -124,6 +126,7 @@ class DownloadManager {
 
         mutable mutex mtx;
         condition_variable cv;
+        chrono::steady_clock::time_point next_download_slot{};
 
         download_options options;
         atomic<int> max_active_downloads{5};

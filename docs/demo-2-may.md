@@ -36,7 +36,7 @@ head -c 134217728 /dev/urandom > /tmp/ds02/demo.bin
 ```bash
 ./build-release/src/peer/PeerApp --tracker http://192.168.1.10:18080 \
   --announce-ip 192.168.1.20 -p 16882 --data-dir /tmp/ds02/p1 \
-  --max-downloads 1 --max-uploads 4 --chunk-delay-ms 150 \
+  --download-limit-mbps 10 --max-downloads 1 --max-uploads 4 --chunk-delay-ms 150 \
   --webui --webui-port 18082
 ```
 
@@ -45,11 +45,12 @@ head -c 134217728 /dev/urandom > /tmp/ds02/demo.bin
 ```bash
 ./build-release/src/peer/PeerApp --tracker http://192.168.1.10:18080 \
   --announce-ip 192.168.1.20 -p 16883 --data-dir /tmp/ds02/l1 \
-  --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
+  --download-limit-mbps 10 --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
   --webui --webui-port 18083
 ```
 
-Delay giúp tải đủ chậm để quan sát. S có **1 slot** để ưu tiên phục vụ P; L sẽ nhận mảnh từ P.
+Mỗi peer tải giới hạn 10 MiB/s bằng `--download-limit-mbps 10` (tổng từ mọi nguồn).
+Delay giúp tải đủ chậm để quan sát; nó có thể làm tốc độ thấp hơn mức giới hạn. S có **1 slot** để ưu tiên phục vụ P; L sẽ nhận mảnh từ P.
 
 ## 2. Chứng minh peer chưa tải xong đã upload được
 
@@ -92,7 +93,7 @@ A bật lại tracker bằng lệnh ở mục 1 để xóa danh sách peer cũ.
 ```bash
 ./build-release/src/peer/PeerApp --tracker http://192.168.1.10:18080 \
   --announce-ip 192.168.1.20 -p 16883 --data-dir /tmp/ds02/l2 \
-  --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
+  --download-limit-mbps 10 --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
   --webui --webui-port 18083
 ```
 
@@ -132,7 +133,7 @@ B Ctrl+C terminal L. A Ctrl+C tracker rồi bật lại bằng lệnh ở mục 
 ```bash
 ./build-release/src/peer/PeerApp --tracker http://192.168.1.10:18080 \
   --announce-ip 192.168.1.20 -p 16883 --data-dir /tmp/ds02/l3 \
-  --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
+  --download-limit-mbps 10 --max-downloads 2 --pipeline-depth 1 --io-timeout-ms 6000 \
   --webui --webui-port 18083
 ```
 

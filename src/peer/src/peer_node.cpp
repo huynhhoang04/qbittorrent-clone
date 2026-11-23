@@ -92,6 +92,8 @@ void PeerNode::set_options(const peer_node_options &new_options)
 
     download_options download;
     download.max_active_downloads = std::max(1, new_options.max_active_downloads);
+    download.max_download_bytes_per_second =
+        static_cast<uint64_t>(std::max(0, new_options.download_limit_mbps)) * 1024 * 1024;
     download.pipeline_depth = std::max(1, new_options.pipeline_depth);
     download.io_timeout_ms = std::max(500, new_options.io_timeout_ms);
     download.connect_timeout_ms = std::max(500, new_options.io_timeout_ms);

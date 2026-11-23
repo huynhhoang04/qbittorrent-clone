@@ -115,6 +115,24 @@ void DownloadManager::request_stop() {
     }
 }
 
+bool DownloadManager::wait_for_download_budget(size_t bytes) {
+    unique_lock<mutex> lock(mtx);
+    const uint64_t rate = options.max_download_bytes_per_second;
+    if (rate == 0) {
+        return !stop_flag.load();
+    }
+
+    // All source workers reserve time on the same clock. Idle time earns no
+    // credit, so adding peers or resuming a transfer cannot multiply the cap.
+    const auto duration = chrono::duration_cast<steady_clock::duration>(
+        chrono::duration<double>(static_cast<double>(bytes) / rate));
+    const auto deadline = std::max(next_download_slot, steady_clock::now()) +
+                          std::max(duration, steady_clock::duration(1));
+    next_download_slot = deadline;
+    // Release mtx while waiting; stop must wake even a very slow transfer.
+    return !cv.wait_until(lock, deadline, [this]() { return stop_flag.load(); });
+}
+
 bool DownloadManager::is_active() const {
     return active_flag.load();
 }
@@ -810,6 +828,10 @@ void DownloadManager::peer_worker(shared_ptr<peer_session> session) {
                 break;
             }
 
+            if (!wait_for_download_budget(received_size)) {
+                break;
+            }
+
             const string data(reinterpret_cast<const char*>(message.payload.data() + 4),
                               received_size);
             const string hash = expected_hash(index);
@@ -1037,6 +1059,7 @@ bool DownloadManager::start_download(const torrent_info& meta, const string& fil
         current_meta = meta;
         current_file_id = meta.file_hash;
         current_file_path = file_path;
+        next_download_slot = steady_clock::now();
         pending_chunks.clear();
         claimed_chunks.clear();
         failed_chunks.clear();
@@ -1067,6 +1090,10 @@ bool DownloadManager::start_download(const torrent_info& meta, const string& fil
 
     log.info("Starting multi-peer download for " + meta.file_name + " (" +
              to_string(meta.num_chunks) + " chunks)");
+    if (options.max_download_bytes_per_second > 0) {
+        log.info("Aggregate download limit: " +
+                 to_string(options.max_download_bytes_per_second) + " bytes/s");
+    }
 
     if (!file_manager->ensure_file_size(file_path, meta.file_size)) {
         record_failure("", "cannot prepare the destination file");

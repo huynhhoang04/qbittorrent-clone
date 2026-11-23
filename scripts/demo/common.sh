@@ -33,7 +33,7 @@ start_peer() {
   local tag="$1" log="$2"
   shift 2
   printf '[MỞ PEER] %s (log: %s)\n' "$tag" "$log" >&2
-  ( exec "$peer_bin" "$@" ) > "$log" 2>&1 &
+  ( exec "$peer_bin" --download-limit-mbps "${QBT_DEMO_DOWNLOAD_MBPS:-10}" "$@" ) > "$log" 2>&1 &
   local pid=$!
   echo "$pid" >>"$pid_registry"
   echo "$pid"

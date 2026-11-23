@@ -8,6 +8,10 @@ Chạy từ thư mục gốc repo. Chọn bản build đã có:
 export QBT_BUILD_DIR="$PWD/build-release"
 ```
 
+Mỗi peer tải được giới hạn **10 MiB/s** để dễ quan sát. Có thể đổi bằng
+`QBT_DEMO_DOWNLOAD_MBPS=5` hoặc bỏ giới hạn bằng `QBT_DEMO_DOWNLOAD_MBPS=0` trước lệnh demo.
+Nếu binary báo không nhận `--download-limit-mbps`, build lại `PeerApp`.
+
 | Thầy muốn xem | Lệnh chạy riêng |
 | --- | --- |
 | Đăng ký và tìm peer | `bash scripts/demo/01-discovery.sh` |
