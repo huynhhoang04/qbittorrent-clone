@@ -73,6 +73,28 @@ try:
     for path, body in [('/api/seed', {'file_path': '/etc/hosts'}), ('/api/download', {'torrent_path': '/etc/hosts'}), ('/api/upload_torrent', {'file_name': '../outside.bin'})]:
         code, _ = request(web_port, path, body)
         record('reject escaped path at ' + path, code == 400, str(code))
+    for chunk_size in ['0', '1', '999999999999', '-1', 'abc']:
+        upload_path = '/api/upload_seed?' + urllib.parse.urlencode({
+            'filename': 'invalid-chunk-size.bin',
+            'chunk_size': chunk_size,
+        })
+        code, body = request(web_port, upload_path, b'invalid chunk size')
+        error = json.loads(body).get('error') if body else None
+        no_file_written = not (work / 'state/shared/invalid-chunk-size.bin').exists()
+        record('reject invalid upload chunk_size ' + repr(chunk_size),
+               code == 400 and error == 'chunk_size must be between 1024 and 67108864 bytes' and no_file_written,
+               str(code))
+    for chunk_size in [0, 1, 999999999999, -5, 'abc']:
+        code, body = request(web_port, '/api/seed', {
+            'file_path': 'shared/safe.bin',
+            'chunk_size': chunk_size,
+        })
+        error = json.loads(body).get('error') if body else None
+        record('reject invalid seed chunk_size ' + repr(chunk_size),
+               code == 400 and error == 'chunk_size must be between 1024 and 67108864 bytes',
+               str(code))
+    code, _ = request(web_port, '/api/status')
+    record('web service remains usable after invalid chunk_size requests', code == 200, str(code))
     status = ready(web_port, '/api/status')
     meta = json.loads((work / 'state/shared/safe.bin.torrent.json').read_text())
     record('upload has trusted metadata and peer registration', meta['file_hash'] == hashlib.sha256(payload).hexdigest())

@@ -1,11 +1,15 @@
 #include "web_ui.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <limits>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <string>
 
 #include "logger.hpp"
 #include "peer_node.hpp"
@@ -15,6 +19,33 @@ using namespace std::chrono;
 using json = nlohmann::json;
 
 namespace {
+
+constexpr size_t MIN_CHUNK_SIZE = 1024;
+constexpr size_t MAX_CHUNK_SIZE = static_cast<size_t>(64) * 1024 * 1024;
+
+bool valid_chunk_size(size_t chunk_size) {
+    return chunk_size >= MIN_CHUNK_SIZE && chunk_size <= MAX_CHUNK_SIZE;
+}
+
+bool parse_chunk_size_param(const string& raw, size_t& out) {
+    if (raw.empty()) {
+        return false;
+    }
+    for (char ch : raw) {
+        if (ch < '0' || ch > '9') {
+            return false;
+        }
+    }
+    try {
+        size_t consumed = 0;
+        out = stoull(raw, &consumed);
+        return consumed == raw.size() && valid_chunk_size(out);
+    } catch (const invalid_argument&) {
+        return false;
+    } catch (const out_of_range&) {
+        return false;
+    }
+}
 
 // A browser-supplied name is written straight to disk, so it must not be able to
 // escape the directory it is joined to. ".." plus a separator would walk out of
@@ -739,8 +770,31 @@ void WebUiServer::setup_routes() {
                                       "{\"error\":\"file_path must point to a file inside the peer data directory\"}");
             }
             size_t chunk_size = 256 * 1024;
-            if (body.contains("chunk_size") && body["chunk_size"].is_number()) {
-                chunk_size = body["chunk_size"].get<size_t>();
+            if (body.contains("chunk_size")) {
+                const auto& chunk_value = body["chunk_size"];
+                std::uint64_t parsed_chunk_size;
+                if (chunk_value.is_number_unsigned()) {
+                    parsed_chunk_size = chunk_value.get<std::uint64_t>();
+                } else if (chunk_value.is_number_integer()) {
+                    const std::int64_t signed_chunk_size = chunk_value.get<std::int64_t>();
+                    if (signed_chunk_size < 0) {
+                        return crow::response(400, "application/json",
+                                              "{\"error\":\"chunk_size must be between 1024 and 67108864 bytes\"}");
+                    }
+                    parsed_chunk_size = static_cast<std::uint64_t>(signed_chunk_size);
+                } else {
+                    return crow::response(400, "application/json",
+                                          "{\"error\":\"chunk_size must be between 1024 and 67108864 bytes\"}");
+                }
+                if (parsed_chunk_size > static_cast<std::uint64_t>(numeric_limits<size_t>::max())) {
+                    return crow::response(400, "application/json",
+                                          "{\"error\":\"chunk_size must be between 1024 and 67108864 bytes\"}");
+                }
+                chunk_size = static_cast<size_t>(parsed_chunk_size);
+                if (!valid_chunk_size(chunk_size)) {
+                    return crow::response(400, "application/json",
+                                          "{\"error\":\"chunk_size must be between 1024 and 67108864 bytes\"}");
+                }
             }
 
             if (!node.seed_file(path, chunk_size)) {
@@ -764,7 +818,12 @@ void WebUiServer::setup_routes() {
                                       "{\"error\":\"Invalid filename: must be a plain file name with no path separators\"}");
             }
             const char* chunk_param = req.url_params.get("chunk_size");
-            size_t chunk_size = (chunk_param && strlen(chunk_param) > 0) ? stoull(chunk_param) : (256 * 1024);
+            size_t chunk_size = 256 * 1024;
+            if (chunk_param && strlen(chunk_param) > 0 &&
+                !parse_chunk_size_param(chunk_param, chunk_size)) {
+                return crow::response(400, "application/json",
+                                      "{\"error\":\"chunk_size must be between 1024 and 67108864 bytes\"}");
+            }
 
             string shared_dir = node.get_data_dir() + "/shared";
             filesystem::create_directories(shared_dir);

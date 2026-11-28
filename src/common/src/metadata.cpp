@@ -20,6 +20,10 @@ using json = nlohmann::json;
 
 bool Metadata::generate_torrent(const string &input_path, size_t chunk_size, const string &output_path, const string& tracker_url){
     Logger log;
+    if (chunk_size == 0) {
+        log.err("chunk_size must be greater than zero");
+        return false;
+    }
     torrent_info info;
     ifstream file(input_path, ios_base::binary);
     if (!file.is_open()) {
